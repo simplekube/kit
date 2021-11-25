@@ -1,2 +1,2 @@
 # kit
-kubernetes made easy by thinking in functions & structures
+kubernetes made simple by thinking in functions & structures
