@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -13,6 +15,111 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func TestGetKindVersionForObject(t *testing.T) {
+	t.Parallel()
+
+	var testcases = []struct {
+		name            string
+		object          client.Object
+		expectedKind    string
+		expectedVersion string
+		isError         bool
+	}{
+		{
+			name: "should get the kind & version of kubernetes configmap",
+			object: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "howdy",
+				},
+			},
+			expectedKind:    "ConfigMap",
+			expectedVersion: "v1",
+		},
+		{
+			name: "should fail since resource is unknown",
+			object: &unstructured.Unstructured{
+				Object: map[string]interface{}{},
+			},
+			isError: true,
+		},
+	}
+
+	for _, test := range testcases {
+		test := test // pin it
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			k, v, err := GetKindVersionForObject(test.object, rscheme)
+			if err != nil && !test.isError {
+				t.Fatalf("expected no error: got %+v", err)
+			}
+			if err == nil && test.isError {
+				t.Fatal("expected error: got none")
+			}
+			if test.isError {
+				return
+			}
+			if k != test.expectedKind {
+				t.Fatalf("expected kind %q got %q", test.expectedKind, k)
+			}
+			if v != test.expectedVersion {
+				t.Fatalf("expected version %q got %q", test.expectedVersion, v)
+			}
+		})
+	}
+}
+
+func TestGet(t *testing.T) {
+	t.Parallel()
+
+	var testcases = []struct {
+		name               string
+		object             client.Object
+		expectedObjectName string
+		isError            bool
+	}{
+		{
+			name: "default namespace exists",
+			object: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "default",
+				},
+			},
+			expectedObjectName: "default",
+		},
+		{
+			name: "none namespace does not exist",
+			object: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "none",
+				},
+			},
+			isError: true,
+		},
+	}
+
+	for _, test := range testcases {
+		test := test // pin it
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := Get(context.Background(), test.object)
+			if err != nil && !test.isError {
+				t.Fatalf("expected no error got %+v", err)
+			}
+			if err == nil && test.isError {
+				t.Fatalf("expected error got none")
+			}
+			if test.isError {
+				return
+			}
+			if test.expectedObjectName != got.GetName() {
+				t.Fatalf("expected object name %q got %q", test.expectedObjectName, got.GetName())
+			}
+		})
+	}
+}
 
 func TestDryRun(t *testing.T) {
 	t.Parallel()
