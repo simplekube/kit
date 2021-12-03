@@ -117,12 +117,17 @@ func InvokeOperationForAllYAMLs(ctx context.Context, operation InvokeFn, filePat
 	}
 
 	if len(objs) == 0 {
-		return nil, errors.Errorf("no kubernetes objects correspond to YAML(s): %q", filePaths)
+		return nil, errors.Errorf("no unstructured objects found: %q", filePaths)
 	}
 
-	var cObjs = make([]client.Object, len(objs))
+	var cObjs = make([]client.Object, 0, len(objs))
 	for _, obj := range objs {
-		cObjs = append(cObjs, obj)
+		if !k8sutil.IsNilUnstructured(obj) {
+			cObjs = append(cObjs, obj)
+		}
+	}
+	if len(cObjs) == 0 {
+		return nil, errors.Errorf("no kubernetes objects found: %q", filePaths)
 	}
 	return InvokeOperationForAllObjects(ctx, operation, cObjs, options...)
 }
@@ -145,7 +150,10 @@ func Get(ctx context.Context, given client.Object, options ...RunOption) (client
 	if err != nil {
 		return nil, err
 	}
-	actual := given.DeepCopyObject().(client.Object)
+	if given == nil {
+		return nil, errors.New("nil object")
+	}
+	actual, _ := given.DeepCopyObject().(client.Object)
 	err = opts.Client.Get(ctx, client.ObjectKeyFromObject(given), actual)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get")
@@ -170,7 +178,10 @@ func Create(ctx context.Context, given client.Object, options ...RunOption) (cli
 	if err != nil {
 		return nil, err
 	}
-	actual := given.DeepCopyObject().(client.Object)
+	if given == nil {
+		return nil, errors.New("nil object")
+	}
+	actual, _ := given.DeepCopyObject().(client.Object)
 	err = opts.Client.Create(ctx, actual)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create")
@@ -195,8 +206,10 @@ func Update(ctx context.Context, given client.Object, options ...RunOption) (cli
 	if err != nil {
 		return nil, err
 	}
-
-	actual := given.DeepCopyObject().(client.Object)
+	if given == nil {
+		return nil, errors.New("nil object")
+	}
+	actual, _ := given.DeepCopyObject().(client.Object)
 	err = opts.Client.Update(ctx, actual)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to update")
@@ -219,9 +232,11 @@ func UpdateForYAML(ctx context.Context, filePath string, options ...RunOption) (
 func Delete(ctx context.Context, given client.Object, options ...RunOption) error {
 	opts, err := makeRunOptions(options...)
 	if err != nil {
-		return errors.Wrap(err, "failed to delete")
+		return err
 	}
-
+	if given == nil {
+		return errors.New("nil object")
+	}
 	return opts.Client.Delete(ctx, given)
 }
 
@@ -251,12 +266,14 @@ func Apply(ctx context.Context, given client.Object, options ...RunOption) (clie
 	if err != nil {
 		return nil, err
 	}
-
+	if given == nil {
+		return nil, errors.New("nil object")
+	}
 	patchOpts := []client.PatchOption{
 		client.ForceOwnership,
 		client.FieldOwner("k8s-toolkit-operation"),
 	}
-	actual := given.DeepCopyObject().(client.Object)
+	actual, _ := given.DeepCopyObject().(client.Object)
 	err = opts.Client.Patch(ctx, actual, client.Apply, patchOpts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to apply")
@@ -284,7 +301,9 @@ func DryRun(ctx context.Context, given client.Object, options ...RunOption) (cli
 	if err != nil {
 		return nil, err
 	}
-
+	if given == nil {
+		return nil, errors.New("nil object")
+	}
 	kind, version, err := GetKindVersionForObject(given, opts.Scheme)
 	if err != nil {
 		return nil, err
@@ -313,7 +332,7 @@ func DryRun(ctx context.Context, given client.Object, options ...RunOption) (cli
 	}
 
 	// Convert the updated unstructured instance to client.Object type
-	actual := given.DeepCopyObject().(client.Object)
+	actual, _ := given.DeepCopyObject().(client.Object)
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(dryRunObj.Object, actual)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to convert unstructured to client.Object")

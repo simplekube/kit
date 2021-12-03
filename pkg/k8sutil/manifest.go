@@ -40,7 +40,7 @@ func BuildObjectsFromYMLs(filePaths []string) ([]*unstructured.Unstructured, err
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to read %q", manifest)
 		}
-		objects = append(objects, objs...)
+		objects = MaybeAppendUnstructuredList(objects, objs)
 	}
 	return objects, nil
 }

@@ -12,6 +12,38 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
+func IsNilUnstructured(given *unstructured.Unstructured) bool {
+	return given == nil || given.Object == nil
+}
+
+func MaybeAppendUnstructured(list []*unstructured.Unstructured, add *unstructured.Unstructured) []*unstructured.Unstructured {
+	if add == nil || add.Object == nil {
+		return list
+	}
+	return append(list, add)
+}
+
+func MaybeAppendUnstructuredList(list []*unstructured.Unstructured, add []*unstructured.Unstructured) []*unstructured.Unstructured {
+	for _, a := range add {
+		list = MaybeAppendUnstructured(list, a)
+	}
+	return list
+}
+
+func MaybeAppend(list []client.Object, add client.Object) []client.Object {
+	if add == nil {
+		return list
+	}
+	return append(list, add)
+}
+
+func MaybeAppendList(list []client.Object, add []client.Object) []client.Object {
+	for _, a := range add {
+		list = MaybeAppend(list, a)
+	}
+	return list
+}
+
 // IsKubernetesObject returns true if the provided unstructured instance
 // resembles a Kubernetes schema
 func IsKubernetesObject(object *unstructured.Unstructured) bool {
