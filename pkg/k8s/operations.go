@@ -161,7 +161,7 @@ func GetForAllYAMLs(ctx context.Context, filePaths []string, options ...RunOptio
 	return InvokeOperationForAllYAMLs(ctx, Get, filePaths, options...)
 }
 
-func GetForYAML(ctx context.Context, filePath string, options ...RunOption) (kObj client.Object, err error) {
+func GetForYAML(ctx context.Context, filePath string, options ...RunOption) (client.Object, error) {
 	return InvokeOperationForYAML(ctx, Get, filePath, options...)
 }
 
