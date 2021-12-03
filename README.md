@@ -47,15 +47,10 @@ work continuously to merge the desired state against the cluster's actual state.
 Making these controllers to work as expected has been a big concern. Bugs often
 leak into production unless the team has in-depth knowledge in building these
 controllers. It is expected to have a thorough knowledge of Kubernetes native
-architectural designs like:
+concepts like:
 
 - 3-way merge (i.e. Apply) & patch operations
-- labels, annotations, sidecars, init containers,
-- services, ports, metrics,
-- rbac & service accounts,
-- sub-resource APIs (i.e. status, scale, etc.),
-- writing idempotent code which can often lead to remapping existing action
-  based APIs to their idempotent equivalents,
+- writing idempotent reconciliation code,
 - & so on.
 
 Above problem gets amplified when a custom operator is dependent on a bunch of
@@ -63,12 +58,7 @@ Kubernetes as well third party operators each maintaining their own state &
 dependencies.
 
 This module is an attempt to solve above challenges by adopting Kubernetes best
-practices & turning them into programmable implementations. It should be able to
-detect issues within the Kubernetes system proactively, report misconfigurations
-if any, analyse performance drifts, & so on. This should be able to consume
-existing libraries that solve some of these problems. This module may eventually
-offer product teams to assert their product's operational needs even before
-running the same in production.
+practices & turning them into programmable implementations.
 
 ## Use as a library
 This project can be used as a library by various out-of-tree golang projects
