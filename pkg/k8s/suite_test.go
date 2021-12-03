@@ -23,8 +23,8 @@ func runMain(m *testing.M) int {
 	var cfg *rest.Config
 
 	testEnv := &envtest.Environment{
-		UseExistingCluster:       pointer.Bool(false),
-		AttachControlPlaneOutput: true,
+		UseExistingCluster: pointer.Bool(false), // use local binaries i.e. etcd & apiserver
+		// AttachControlPlaneOutput: true,
 	}
 	cfg, err = testEnv.Start()
 	if err != nil {
