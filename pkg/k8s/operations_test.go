@@ -6,12 +6,12 @@ import (
 	"math/rand"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -52,7 +52,7 @@ func TestGetKindVersionForObject(t *testing.T) {
 
 			k, v, err := GetKindVersionForObject(test.object, rscheme)
 			if err != nil && !test.isError {
-				t.Fatalf("expected no error: got %+v", err)
+				t.Fatalf("expected no error got: %+v", err)
 			}
 			if err == nil && test.isError {
 				t.Fatal("expected error: got none")
@@ -106,7 +106,7 @@ func TestGet(t *testing.T) {
 
 			got, err := Get(context.Background(), test.object)
 			if err != nil && !test.isError {
-				t.Fatalf("expected no error got %+v", err)
+				t.Fatalf("expected no error got: %+v", err)
 			}
 			if err == nil && test.isError {
 				t.Fatalf("expected error got none")
@@ -116,6 +116,89 @@ func TestGet(t *testing.T) {
 			}
 			if test.expectedObjectName != got.GetName() {
 				t.Fatalf("expected object name %q got %q", test.expectedObjectName, got.GetName())
+			}
+		})
+	}
+}
+
+func TestGetAll(t *testing.T) {
+	t.Parallel()
+
+	var testcases = []struct {
+		name                string
+		objects             []client.Object
+		expectedObjectNames []string
+		isError             bool
+	}{
+		{
+			name: "default namespace exists",
+			objects: []client.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "default",
+					},
+				},
+			},
+			expectedObjectNames: []string{"default"},
+		},
+		{
+			name: "can not get without a namespace",
+			objects: []client.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "default",
+					},
+				},
+			},
+			isError: true,
+		},
+		{
+			name: "default service account does not exist",
+			objects: []client.Object{
+				&corev1.ServiceAccount{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "default",
+						Namespace: "default",
+					},
+				},
+			},
+			isError: true,
+		},
+		{
+			name: "none namespace does not exist",
+			objects: []client.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "none",
+					},
+				},
+			},
+			isError: true,
+		},
+	}
+
+	for _, test := range testcases {
+		test := test // pin it
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := GetAll(context.Background(), test.objects)
+			if err != nil && !test.isError {
+				t.Fatalf("expected no error got: %+v", err)
+			}
+			if err == nil && test.isError {
+				t.Fatalf("expected error got none")
+			}
+			if test.isError {
+				return
+			}
+			var expectedNameSet = sets.NewString(test.expectedObjectNames...)
+			var actualNameSet = sets.String{}
+			for _, g := range got {
+				actualNameSet.Insert(g.GetName())
+			}
+			if !actualNameSet.Equal(expectedNameSet) {
+				t.Fatalf("names not found: %v", expectedNameSet.Difference(actualNameSet))
 			}
 		})
 	}
