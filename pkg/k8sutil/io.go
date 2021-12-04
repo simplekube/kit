@@ -23,20 +23,17 @@ func ReadKubernetesObjects(r io.Reader) ([]*unstructured.Unstructured, error) {
 				err = nil
 				break
 			}
-			return objects, errors.Wrap(err, "failed to decode into unstructured instance")
+			return objects, errors.Wrap(err, "decode to unstructured")
 		}
 
 		if obj.IsList() {
-			err = obj.EachListItem(func(item runtime.Object) error {
-				obj := item.(*unstructured.Unstructured)
+			_ = obj.EachListItem(func(item runtime.Object) (_ error) {
+				obj, _ := item.(*unstructured.Unstructured)
 				if IsKubernetesObject(obj) && !IsKustomizeObject(obj) {
 					objects = append(objects, obj)
 				}
 				return nil
 			})
-			if err != nil {
-				return objects, err
-			}
 			continue
 		}
 

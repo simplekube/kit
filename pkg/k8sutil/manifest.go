@@ -6,6 +6,8 @@ import (
 	"path"
 	"sort"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -29,46 +31,53 @@ func BuildObjectsFromYMLs(filePaths []string) ([]*unstructured.Unstructured, err
 	if err != nil {
 		return nil, err
 	}
+
+	var errs = make([]error, 0, len(manifests))
 	for _, manifest := range manifests {
 		ms, err := os.Open(manifest)
 		if err != nil {
-			return nil, err
+			errs = append(errs, errors.Wrapf(err, "yaml %q", manifest))
+			continue
 		}
 
 		objs, err := ReadKubernetesObjects(bufio.NewReader(ms))
 		ms.Close()
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to read %q", manifest)
+			errs = append(errs, err)
+			continue
 		}
 		objects = MaybeAppendUnstructuredList(objects, objs)
 	}
-	return objects, nil
+	return objects, (&multierror.Error{Errors: errs}).ErrorOrNil()
 }
 
 func ScanForYMLsFromPaths(paths []string) ([]string, error) {
 	var manifests []string
 
-	for _, in := range paths {
-		fi, err := os.Stat(in)
+	var errs = make([]error, 0, len(paths))
+	for _, path := range paths {
+		fi, err := os.Stat(path)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get file info")
+			errs = append(errs, errors.Wrapf(err, "path %q", path))
+			continue
 		}
 
 		switch mode := fi.Mode(); {
 		case mode.IsDir():
-			m, err := ScanForYMLsFromDir(in)
+			m, err := ScanForYMLsFromDir(path)
 			if err != nil {
-				return nil, err
+				errs = append(errs, errors.Wrapf(err, "path %q", path))
+				continue
 			}
 			manifests = append(manifests, m...)
 		case mode.IsRegular():
-			if IsExtYML(fi.Name()) {
-				manifests = append(manifests, in)
+			if IsExtensionYML(fi.Name()) {
+				manifests = append(manifests, path)
 			}
 		}
 	}
 
-	return manifests, nil
+	return manifests, (&multierror.Error{Errors: errs}).ErrorOrNil()
 }
 
 // ScanForYMLsFromDir scans for files present in the provided directory &
@@ -77,26 +86,28 @@ func ScanForYMLsFromDir(dir string) ([]string, error) {
 	var manifests []string
 	files, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read %q", dir)
+		return nil, errors.Wrapf(err, "dir %q", dir)
 	}
 
+	var errs = make([]error, 0, len(files))
 	for _, file := range files {
 		if file.IsDir() {
 			m, err := ScanForYMLsFromDir(path.Join(dir, file.Name()))
 			if err != nil {
-				return nil, err
+				errs = append(errs, err)
+				continue
 			}
 			manifests = append(manifests, m...)
 		}
-		if IsExtYML(file.Name()) {
+		if IsExtensionYML(file.Name()) {
 			manifests = append(manifests, path.Join(dir, file.Name()))
 		}
 	}
-	return manifests, err
+	return manifests, (&multierror.Error{Errors: errs}).ErrorOrNil()
 }
 
-// IsExtYML returns true if provided file has yaml extension
-func IsExtYML(f string) bool {
+// IsExtensionYML returns true if provided file has yaml extension
+func IsExtensionYML(f string) bool {
 	ext := path.Ext(f)
 	return ext == ".yaml" || ext == ".yml"
 }
