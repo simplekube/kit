@@ -1,0 +1,11 @@
+---
+# non kubernetes yaml fragment
+hi: there
+name: testing
+---
+# kubernetes yaml fragment
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: custom
+---

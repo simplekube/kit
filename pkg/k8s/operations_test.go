@@ -204,6 +204,132 @@ func TestGetAll(t *testing.T) {
 	}
 }
 
+func TestGetForYAML(t *testing.T) {
+	t.Parallel()
+
+	var testcases = []struct {
+		name               string
+		fixture            string
+		expectedObjectName string
+		isError            bool
+	}{
+		{
+			name:    "empty yaml should error",
+			fixture: "testdata/empty.yaml",
+			isError: true,
+		},
+		{
+			name:    "non kubernetes yaml should error",
+			fixture: "testdata/non_kubernetes.yaml",
+			isError: true,
+		},
+		{
+			name:               "default namespace exists",
+			fixture:            "testdata/default_namespace.yaml",
+			expectedObjectName: "default",
+		},
+		{
+			name:    "custom namespace does not exist",
+			fixture: "testdata/custom_namespace.yaml",
+			isError: true,
+		},
+	}
+
+	for _, test := range testcases {
+		test := test // pin it
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := GetForYAML(context.Background(), test.fixture)
+			if err != nil && !test.isError {
+				t.Fatalf("expected no error got: %+v", err)
+			}
+			if err == nil && test.isError {
+				t.Fatalf("expected error got none")
+			}
+			if test.isError {
+				return
+			}
+			if test.expectedObjectName != got.GetName() {
+				t.Fatalf("expected object name %q got %q", test.expectedObjectName, got.GetName())
+			}
+		})
+	}
+}
+
+func TestGetForAllYAMLs(t *testing.T) {
+	t.Parallel()
+
+	var testcases = []struct {
+		name                string
+		fixtures            []string
+		expectedObjectNames []string
+		isError             bool
+	}{
+		{
+			name:     "empty yaml should error",
+			fixtures: []string{"testdata/empty.yaml"},
+			isError:  true,
+		},
+		{
+			name:     "non kubernetes yaml should error",
+			fixtures: []string{"testdata/non_kubernetes.yaml"},
+			isError:  true,
+		},
+		{
+			name:     "invalid kubernetes yaml should error",
+			fixtures: []string{"testdata/invalid_kubernetes.yaml"},
+			isError:  true,
+		},
+		{
+			name:     "non kubernetes & kubernetes yaml should error",
+			fixtures: []string{"testdata/non_kubernetes_and_custom_namespace.yaml"},
+			isError:  true,
+		},
+		{
+			name:                "default namespace exists",
+			fixtures:            []string{"testdata/default_namespace.yaml"},
+			expectedObjectNames: []string{"default"},
+		},
+		{
+			name:     "custom namespace does not exist",
+			fixtures: []string{"testdata/custom_namespace.yaml"},
+			isError:  true,
+		},
+		{
+			name:     "list of custom namespaces do not exist",
+			fixtures: []string{"testdata/custom_namespace_list.yaml"},
+			isError:  true,
+		},
+	}
+
+	for _, test := range testcases {
+		test := test // pin it
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := GetForAllYAMLs(context.Background(), test.fixtures)
+			if err != nil && !test.isError {
+				t.Fatalf("expected no error got: %+v", err)
+			}
+			if err == nil && test.isError {
+				t.Fatalf("expected error got none")
+			}
+			if test.isError {
+				return
+			}
+			var expectedNameSet = sets.NewString(test.expectedObjectNames...)
+			var actualNameSet = sets.String{}
+			for _, g := range got {
+				actualNameSet.Insert(g.GetName())
+			}
+			if !actualNameSet.Equal(expectedNameSet) {
+				t.Fatalf("names not found: %v", expectedNameSet.Difference(actualNameSet))
+			}
+		})
+	}
+}
+
 func TestDryRun(t *testing.T) {
 	t.Parallel()
 

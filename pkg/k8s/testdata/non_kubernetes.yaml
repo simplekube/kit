@@ -1,0 +1,9 @@
+---
+# not a kubernetes api specifications
+hi: there
+name: testing
+---
+# not a kubernetes api specifications
+err: something
+status: testing
+---

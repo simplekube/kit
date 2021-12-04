@@ -1,0 +1,25 @@
+---
+# missing apiVersion & name
+kind: Hi
+---
+# missing kind & name
+apiVersion: v1
+---
+# missing kind & apiVersion
+metadata:
+  name: whoami
+---
+# missing name
+apiVersion: v1
+kind: Hi
+---
+# missing apiVersion
+kind: Hi
+metadata:
+  name: whoami
+---
+# missing kind
+apiVersion: v1
+metadata:
+  name: whoami
+---
