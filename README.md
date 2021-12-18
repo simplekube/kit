@@ -2,7 +2,7 @@
 Kubernetes' operations made simple. This is done by exposing ready to use
 functions & structures.
 
-Built on top of [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime)
+A very thin wrapper over [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime)
 
 ## Build & test
 - make
