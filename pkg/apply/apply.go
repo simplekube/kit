@@ -40,12 +40,7 @@ func SetLastAppliedByAnnKey(
 
 	lastAppliedJSON, err := json.Marshal(lastApplied)
 	if err != nil {
-		return errors.Wrapf(
-			err,
-			"failed to marshal last applied state: %s: annotation %s",
-			k8sutil.DescribeObj(obj),
-			annKey,
-		)
+		return errors.Wrapf(err, "annotation %q: object %s", annKey, k8sutil.DescribeObj(obj))
 	}
 
 	ann := obj.GetAnnotations()
@@ -83,10 +78,7 @@ func GetLastApplied(obj *unstructured.Unstructured) (map[string]interface{}, err
 
 // GetLastAppliedByAnnKey returns the last applied state of the given
 // object based on the provided annotation
-func GetLastAppliedByAnnKey(
-	obj *unstructured.Unstructured, annKey string,
-) (map[string]interface{}, error) {
-
+func GetLastAppliedByAnnKey(obj *unstructured.Unstructured, annKey string) (map[string]interface{}, error) {
 	lastAppliedJSON := obj.GetAnnotations()[annKey]
 	if lastAppliedJSON == "" {
 		return nil, nil
@@ -94,12 +86,7 @@ func GetLastAppliedByAnnKey(
 
 	lastApplied := make(map[string]interface{})
 	err := json.Unmarshal([]byte(lastAppliedJSON), &lastApplied)
-	return lastApplied, errors.Wrapf(
-		err,
-		"failed to unmarshal last applied state: %s : annotation %s",
-		k8sutil.DescribeObj(obj),
-		annKey,
-	)
+	return lastApplied, errors.Wrapf(err, "annotation %q: object %s", annKey, k8sutil.DescribeObj(obj))
 }
 
 // Merge updates the observed object with the desired changes.
@@ -110,7 +97,7 @@ func Merge(observed, lastApplied, desired map[string]interface{}) (map[string]in
 	observedAsDest := runtime.DeepCopyJSON(observed)
 
 	if _, err := mergeToObserved("", observedAsDest, lastApplied, desired); err != nil {
-		return nil, errors.Wrapf(err, "failed to merge desired state")
+		return nil, errors.Wrapf(err, "merge desired to observed")
 	}
 	return observedAsDest, nil
 }
@@ -125,7 +112,7 @@ func mergeToObserved(fieldPath string, observed, lastApplied, desired interface{
 		if !ok && lastAppliedVal != nil {
 			return nil,
 				errors.Errorf(
-					"type mismatch: observed state %T: last applied state %T: field %q",
+					"type mismatch: observed %T: last applied %T: path %q",
 					observed, lastApplied, fieldPath,
 				)
 		}
@@ -133,7 +120,7 @@ func mergeToObserved(fieldPath string, observed, lastApplied, desired interface{
 		if !ok && desiredVal != nil {
 			return nil,
 				errors.Errorf(
-					"type mismatch: observed state %T: desired state %T: field %q",
+					"type mismatch: observed %T: desired %T: path %q",
 					observed, desired, fieldPath,
 				)
 		}
@@ -146,7 +133,7 @@ func mergeToObserved(fieldPath string, observed, lastApplied, desired interface{
 		if !ok && lastAppliedVal != nil {
 			return nil,
 				errors.Errorf(
-					"type mismatch: observed state %T: last applied state %T: field %q",
+					"type mismatch: observed %T: last applied %T: path %q",
 					observed, lastApplied, fieldPath,
 				)
 		}
@@ -154,7 +141,7 @@ func mergeToObserved(fieldPath string, observed, lastApplied, desired interface{
 		if !ok && desiredVal != nil {
 			return nil,
 				fmt.Errorf(
-					"type mismatch: observed state %T: desired state %T: field %q",
+					"type mismatch: observed %T: desired %T: path %q",
 					observed, desired, fieldPath,
 				)
 		}
@@ -316,7 +303,7 @@ var knownMergeKeys = []string{
 	"key",
 	"component",
 	"containerPort",
-	"container-port",
+	"container-port", // TODO @amit.das Provide a way to register customMergeKeys
 	"port",
 	"ip",
 }
