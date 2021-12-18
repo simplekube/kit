@@ -67,11 +67,11 @@ func DeleteNullInUnstruct(m map[string]interface{}) (map[string]interface{}, err
 		}
 		switch typedVal := val.(type) {
 		default:
-			return nil, errors.Errorf("unknown type: %v", reflect.TypeOf(typedVal))
+			return nil, errors.Errorf("unknown type: %T", val)
 		case []interface{}:
 			slice, err := DeleteNullInSlice(typedVal)
 			if err != nil {
-				return nil, errors.Errorf("could not delete null values from subslice")
+				return nil, errors.Errorf("failed to delete null value(s): key %q", key)
 			}
 			filteredMap[key] = slice
 		case string, float64, bool, int64, nil:
@@ -85,9 +85,8 @@ func DeleteNullInUnstruct(m map[string]interface{}) (map[string]interface{}, err
 			var filteredSubMap map[string]interface{}
 			filteredSubMap, err = DeleteNullInUnstruct(typedVal)
 			if err != nil {
-				return nil, errors.Wrap(err, "could not delete null values from filtered sub map")
+				return nil, err
 			}
-
 			if len(filteredSubMap) != 0 {
 				filteredMap[key] = filteredSubMap
 			}
@@ -104,11 +103,11 @@ func DeleteNullInSlice(m []interface{}) ([]interface{}, error) {
 		}
 		switch typedVal := val.(type) {
 		default:
-			return nil, errors.Errorf("unknown type: %v", reflect.TypeOf(typedVal))
+			return nil, errors.Errorf("unknown type: %T", val)
 		case []interface{}:
 			filteredSubSlice, err := DeleteNullInSlice(typedVal)
 			if err != nil {
-				return nil, errors.Errorf("could not delete null values from subslice")
+				return nil, err
 			}
 			filteredSlice[key] = filteredSubSlice
 		case string, float64, bool, int64, nil:
@@ -116,7 +115,7 @@ func DeleteNullInSlice(m []interface{}) ([]interface{}, error) {
 		case map[string]interface{}:
 			filteredMap, err := DeleteNullInUnstruct(typedVal)
 			if err != nil {
-				return nil, errors.Wrap(err, "could not delete null values from filtered sub map")
+				return nil, err
 			}
 			filteredSlice[key] = filteredMap
 		}
