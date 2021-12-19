@@ -36,30 +36,35 @@ import (
 // 	)
 // }
 
-// func DeleteNullInUnstruct(given []byte) ([]byte, map[string]interface{}, error) {
-// 	var patchMap map[string]interface{}
+// func DeleteNullInUnstructuredBytes(given []byte) ([]byte, map[string]interface{}, error) {
+// 	var givenMap map[string]interface{}
 //
-// 	err := json.Unmarshal(given, &patchMap)
+// 	err := json.Unmarshal(given, &givenMap)
 // 	if err != nil {
-// 		return nil, nil, errors.Wrap(err, "could not unmarshal json patch")
+// 		return nil, nil, errors.Wrap(err, "unmarshal bytes to map")
 // 	}
 //
-// 	filteredMap, err := DeleteNullInUnstruct(patchMap)
+// 	filteredMap, err := DeleteNullInUnstructuredMap(givenMap)
 // 	if err != nil {
-// 		return nil, nil, errors.Wrap(err, "could not delete null values from patch map")
+// 		return nil, nil, err
 // 	}
 //
 // 	o, err := json.ConfigCompatibleWithStandardLibrary.Marshal(filteredMap)
 // 	if err != nil {
-// 		return nil, nil, errors.Wrap(err, "could not marshal filtered patch map")
+// 		return nil, nil, errors.Wrap(err, "marshal map to bytes")
 // 	}
 //
 // 	return o, filteredMap, err
 // }
 
-func DeleteNullInUnstruct(m map[string]interface{}) (map[string]interface{}, error) {
+// DeleteNullInUnstructuredMap removes the key value pairs for those value(s)
+// that represent a nil. It also removes the key: value when value of string
+// type is empty i.e "".
+//
+// Note: This supports Kubernetes compatible unstructured types only
+func DeleteNullInUnstructuredMap(m map[string]interface{}) (map[string]interface{}, error) {
 	var err error
-	filteredMap := make(map[string]interface{})
+	filteredMap := make(map[string]interface{}, len(m))
 
 	for key, val := range m {
 		if val == nil || IsZero(reflect.ValueOf(val)) {
@@ -67,11 +72,12 @@ func DeleteNullInUnstruct(m map[string]interface{}) (map[string]interface{}, err
 		}
 		switch typedVal := val.(type) {
 		default:
-			return nil, errors.Errorf("unknown type: %T", val)
+			// Only Kubernetes unstructured types are supported
+			return nil, errors.Errorf("unsupported type %T: key %q", val, key)
 		case []interface{}:
-			slice, err := DeleteNullInSlice(typedVal)
+			slice, err := DeleteNullInUnstructuredSlice(typedVal)
 			if err != nil {
-				return nil, errors.Errorf("failed to delete null value(s): key %q", key)
+				return nil, errors.Wrapf(err, "delete null in slice: key %q", key)
 			}
 			filteredMap[key] = slice
 		case string, float64, bool, int64, nil:
@@ -81,9 +87,8 @@ func DeleteNullInUnstruct(m map[string]interface{}) (map[string]interface{}, err
 				filteredMap[key] = typedVal
 				continue
 			}
-
 			var filteredSubMap map[string]interface{}
-			filteredSubMap, err = DeleteNullInUnstruct(typedVal)
+			filteredSubMap, err = DeleteNullInUnstructuredMap(typedVal)
 			if err != nil {
 				return nil, err
 			}
@@ -95,29 +100,34 @@ func DeleteNullInUnstruct(m map[string]interface{}) (map[string]interface{}, err
 	return filteredMap, nil
 }
 
-func DeleteNullInSlice(m []interface{}) ([]interface{}, error) {
+// DeleteNullInUnstructuredSlice removes the key value pairs for those value(s)
+// that represent a nil.
+//
+// Note: This supports Kubernetes compatible unstructured types only
+func DeleteNullInUnstructuredSlice(m []interface{}) ([]interface{}, error) {
 	filteredSlice := make([]interface{}, len(m))
-	for key, val := range m {
+	for idx, val := range m {
 		if val == nil {
 			continue
 		}
 		switch typedVal := val.(type) {
 		default:
-			return nil, errors.Errorf("unknown type: %T", val)
+			// Only Kubernetes unstructured types are supported
+			return nil, errors.Errorf("unsupported type %T", val)
 		case []interface{}:
-			filteredSubSlice, err := DeleteNullInSlice(typedVal)
+			filteredSubSlice, err := DeleteNullInUnstructuredSlice(typedVal)
 			if err != nil {
 				return nil, err
 			}
-			filteredSlice[key] = filteredSubSlice
+			filteredSlice[idx] = filteredSubSlice
 		case string, float64, bool, int64, nil:
-			filteredSlice[key] = val
+			filteredSlice[idx] = val
 		case map[string]interface{}:
-			filteredMap, err := DeleteNullInUnstruct(typedVal)
+			filteredMap, err := DeleteNullInUnstructuredMap(typedVal)
 			if err != nil {
 				return nil, err
 			}
-			filteredSlice[key] = filteredMap
+			filteredSlice[idx] = filteredMap
 		}
 	}
 	return filteredSlice, nil
