@@ -72,4 +72,4 @@ practices & turning them into programmable implementations.
 This project can be used as a library by various out-of-tree golang projects
 
 ## References
-- TODO
+- https://github.com/banzaicloud/k8s-objectmatcher
