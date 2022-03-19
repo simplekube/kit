@@ -1,31 +1,36 @@
 package k8s
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDeleteNullInUnstructuredMap(t *testing.T) {
 	t.Parallel()
 
+	errContentUnsupportedType := "unsupported type"
 	var tests = []struct {
-		name   string
-		given  map[string]interface{}
-		expect map[string]interface{}
-		isErr  bool
+		name       string
+		given      map[string]interface{}
+		expect     map[string]interface{}
+		errContent string
+		isErr      bool
 	}{
 		{
-			name: "int is an invalid data type",
+			name: "field with int value is unsupported",
 			given: map[string]interface{}{
 				"hi":           "there",
 				"i-am-invalid": 10,
 			},
-			isErr: true,
+			errContent: errContentUnsupportedType,
+			isErr:      true,
 		},
 		{
-			name: "int64 is a valid data type",
+			name: "field with int64 value is supported & is preserved",
 			given: map[string]interface{}{
 				"hi":         "there",
 				"i-am-valid": int64(10),
@@ -36,7 +41,7 @@ func TestDeleteNullInUnstructuredMap(t *testing.T) {
 			},
 		},
 		{
-			name: "int64(0) is preserved",
+			name: "field with int64(0) value is supported & is preserved",
 			given: map[string]interface{}{
 				"i-am-valid": int64(0),
 			},
@@ -45,7 +50,7 @@ func TestDeleteNullInUnstructuredMap(t *testing.T) {
 			},
 		},
 		{
-			name: "float64(0.0) is preserved",
+			name: "field with float64(0.0) is supported & is preserved",
 			given: map[string]interface{}{
 				"i-am-valid": float64(0),
 			},
@@ -54,7 +59,7 @@ func TestDeleteNullInUnstructuredMap(t *testing.T) {
 			},
 		},
 		{
-			name: "empty string is deleted",
+			name: "field with empty string value is deleted",
 			given: map[string]interface{}{
 				"hi":         "there",
 				"i-am-empty": "",
@@ -64,7 +69,7 @@ func TestDeleteNullInUnstructuredMap(t *testing.T) {
 			},
 		},
 		{
-			name: "nil is deleted",
+			name: "field with nil value is deleted",
 			given: map[string]interface{}{
 				"hi":         "there",
 				"i-am-empty": nil,
@@ -74,7 +79,7 @@ func TestDeleteNullInUnstructuredMap(t *testing.T) {
 			},
 		},
 		{
-			name: "interface{}(nil) is deleted",
+			name: "field with interface{}(nil) value is deleted",
 			given: map[string]interface{}{
 				"hi":         "there",
 				"i-am-empty": interface{}(nil),
@@ -84,30 +89,41 @@ func TestDeleteNullInUnstructuredMap(t *testing.T) {
 			},
 		},
 		{
-			name: `interface{}("") is deleted`,
+			name: `field with interface{}("") value is deleted`,
 			given: map[string]interface{}{
 				"i-am-empty": interface{}(""),
 			},
 			expect: map[string]interface{}{},
 		},
 		{
-			name: "[]int is invalid",
+			name: "field with []int value is unsupported",
 			given: map[string]interface{}{
 				"hi":         "there",
 				"i-am-empty": []int{},
 			},
-			isErr: true,
+			errContent: errContentUnsupportedType,
+			isErr:      true,
 		},
 		{
-			name: "[]int64 is invalid",
+			name: "field with []int64 value is unsupported",
 			given: map[string]interface{}{
 				"hi":         "there",
 				"i-am-empty": []int64{},
 			},
-			isErr: true,
+			errContent: errContentUnsupportedType,
+			isErr:      true,
 		},
 		{
-			name: "[]interface{}{} is preserved",
+			name: "field with []string{} is unsupported",
+			given: map[string]interface{}{
+				"hi":                             "there",
+				"array-of-string-without-values": []string{},
+			},
+			errContent: errContentUnsupportedType,
+			isErr:      true,
+		},
+		{
+			name: "field with []interface{}{} is preserved",
 			given: map[string]interface{}{
 				"i-am-empty": []interface{}{},
 			},
@@ -116,7 +132,7 @@ func TestDeleteNullInUnstructuredMap(t *testing.T) {
 			},
 		},
 		{
-			name: "[]interface{nil} is preserved",
+			name: "field with []interface{nil} is preserved",
 			given: map[string]interface{}{
 				"hi":         "there",
 				"i-am-empty": []interface{}{nil},
@@ -127,14 +143,14 @@ func TestDeleteNullInUnstructuredMap(t *testing.T) {
 			},
 		},
 		{
-			name: "[]interface{}(nil) is deleted",
+			name: "field with []interface{}(nil) value is deleted",
 			given: map[string]interface{}{
 				"i-am-empty": []interface{}(nil),
 			},
 			expect: map[string]interface{}{},
 		},
 		{
-			name: `list of empty string is preserved`,
+			name: `field with []interface{}{""} is preserved`,
 			given: map[string]interface{}{
 				"list-of-empty-string": []interface{}{""},
 			},
@@ -143,7 +159,7 @@ func TestDeleteNullInUnstructuredMap(t *testing.T) {
 			},
 		},
 		{
-			name: `list of empty strings are preserved`,
+			name: `field with list of empty strings is preserved`,
 			given: map[string]interface{}{
 				"list-of-empty-strings": []interface{}{"", ""},
 			},
@@ -152,7 +168,7 @@ func TestDeleteNullInUnstructuredMap(t *testing.T) {
 			},
 		},
 		{
-			name: "list of string is preserved",
+			name: "field with list of strings is preserved",
 			given: map[string]interface{}{
 				"list-of-string": []interface{}{"hi", "there"},
 			},
@@ -161,7 +177,7 @@ func TestDeleteNullInUnstructuredMap(t *testing.T) {
 			},
 		},
 		{
-			name: "list of int64 is preserved",
+			name: "field with list of int64 is preserved",
 			given: map[string]interface{}{
 				"hi":            "there",
 				"list-of-int64": []interface{}{int64(1), int64(2)},
@@ -172,7 +188,7 @@ func TestDeleteNullInUnstructuredMap(t *testing.T) {
 			},
 		},
 		{
-			name: "list of string maps is preserved",
+			name: "field with list of string maps is preserved",
 			given: map[string]interface{}{
 				"list-of-string-map": []interface{}{
 					map[string]interface{}{
@@ -197,7 +213,7 @@ func TestDeleteNullInUnstructuredMap(t *testing.T) {
 			},
 		},
 		{
-			name: "list of int64 maps is preserved",
+			name: "field with list of int64 maps is preserved",
 			given: map[string]interface{}{
 				"list-of-int64-map": []interface{}{
 					map[string]interface{}{
@@ -228,17 +244,14 @@ func TestDeleteNullInUnstructuredMap(t *testing.T) {
 			t.Parallel()
 
 			got, err := DeleteNullInUnstructuredMap(test.given)
-			if !test.isErr && err != nil {
-				t.Errorf("expected no error got %+v", err)
-				return
-			}
-			if test.isErr && err == nil {
-				t.Errorf("expected error got none")
-				return
-			}
-			if !reflect.DeepEqual(got, test.expect) {
-				diff := cmp.Diff(got, test.expect)
-				t.Errorf("expected no diff got: -actual +want\n%s\n", diff)
+			if !test.isErr {
+				assert.NoError(t, err)
+				if !reflect.DeepEqual(got, test.expect) {
+					diff := cmp.Diff(got, test.expect)
+					assert.Equal(t, "", fmt.Sprintf("-actual +want\n%s\n", diff))
+				}
+			} else {
+				assert.Error(t, err)
 			}
 		})
 	}
