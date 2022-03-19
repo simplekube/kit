@@ -24,6 +24,9 @@ that solves their problems.
 ## Use as a library
 This project can be used as a library by various out-of-tree golang projects
 
+## Technical Details
+- A thin wrapper over [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime)
+
 ## Build & Test
 - make
 
