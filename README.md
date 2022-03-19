@@ -1,6 +1,6 @@
 # kit
 Kubernetes' operations made simple. This is done by exposing ready to use
-functions & structures.
+functions.
 
 A very thin wrapper over [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime)
 
@@ -29,15 +29,12 @@ ls -ltr /usr/local/kubebuilder/bin/k8s/1.22.1-darwin-amd64
 ## Motivation
 Project kit is based on the experiences we had building & conforming Kubernetes
 operators across projects such as [OpenEBS](https://github.com/openebs),
-[Metac](https://github.com/AmitKumarDas/metac) & building platforms at organisations
-such as [MayaData](https://mayadata.io/) & [JIMDO](https://www.jimdo.com/).
+[Metac](https://github.com/AmitKumarDas/metac) & building platforms at 
+organisations such as [MayaData](https://mayadata.io/) & 
+[JIMDO](https://www.jimdo.com/).
 
-There was a need for a self servicing DevOps platform for teams across the org.
-In all the cases, it was decided to use Kubernetes as its substrate since latter
-has found wider acceptance in the infrastructure community. However, given the
-ever expanding projects within Kubernetes ecosystem, it has become a challenge
-to choose, build & **conform** if these selected projects solve the platform's
-opertional needs.
+There was a need for utility functions to solve bigger challenges faced by teams
+using Kubernetes.
 
 Take for example following questions that an infrastructure platform should be
 able to answer confidently:
