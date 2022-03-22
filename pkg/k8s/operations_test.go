@@ -873,19 +873,21 @@ func TestCreateOrMerge(t *testing.T) {
 		finalizers  []string
 		expected    OperationResult
 	}
-	tests := []*testable{
+	// These scenarios should run serially i.e. one after the other
+	// in the given order
+	scenarios := []*testable{
 		{
-			it:        "should create the deployment",
+			it:        "should verify successful creation of the deployment",
 			deployObj: deploy.DeepCopy(),
 			expected:  OperationResultCreated,
 		},
 		{
-			it:        "should not result in any change",
+			it:        "should verify no change to cluster state since it matches the local state",
 			deployObj: deploy.DeepCopy(),
 			expected:  OperationResultNone,
 		},
 		{
-			it:        "should update the deployment with labels",
+			it:        "should verify successful update of the deployment with labels",
 			deployObj: deploy.DeepCopy(),
 			labels: map[string]string{
 				"foo-1": "bar-1",
@@ -893,7 +895,7 @@ func TestCreateOrMerge(t *testing.T) {
 			expected: OperationResultUpdatedResourceOnly,
 		},
 		{
-			it:        "should update the deployment with annotations",
+			it:        "should verify successful update of the deployment with annotations",
 			deployObj: deploy.DeepCopy(),
 			annotations: map[string]string{
 				"foo-1": "bar-1",
@@ -901,7 +903,7 @@ func TestCreateOrMerge(t *testing.T) {
 			expected: OperationResultUpdatedResourceOnly,
 		},
 		{
-			it:        "should not result in any change since labels & annotations remain same",
+			it:        "should verify no change in cluster state since its labels & annotations matches the local state",
 			deployObj: deploy.DeepCopy(),
 			annotations: map[string]string{
 				"foo-1": "bar-1", // no change
@@ -912,7 +914,7 @@ func TestCreateOrMerge(t *testing.T) {
 			expected: OperationResultNone,
 		},
 		{
-			it:        "should update the deployment with finalizers",
+			it:        "should verify successful update of the deployment with finalizers",
 			deployObj: deploy.DeepCopy(),
 			finalizers: []string{
 				"protect.io/storage",
@@ -921,7 +923,7 @@ func TestCreateOrMerge(t *testing.T) {
 			expected: OperationResultUpdatedResourceOnly,
 		},
 		{
-			it:        "should update the deployment by updating the finalizers",
+			it:        "should verify successful update of the deployment by updating the finalizers",
 			deployObj: deploy.DeepCopy(),
 			finalizers: []string{
 				"protect.io/storage",
@@ -929,7 +931,7 @@ func TestCreateOrMerge(t *testing.T) {
 			expected: OperationResultUpdatedResourceOnly,
 		},
 		{
-			it:        "should not result in any change since labels, annotations & finalizers remain same",
+			it:        "should verify no change to cluster state since its labels, annotations & finalizers matches the local state",
 			deployObj: deploy.DeepCopy(),
 			finalizers: []string{
 				"protect.io/storage", // no new change
@@ -956,41 +958,37 @@ func TestCreateOrMerge(t *testing.T) {
 			)
 		}
 	}()
-	for _, testcase := range tests {
-		if len(testcase.labels) != 0 {
-			lbls := testcase.deployObj.GetLabels()
+	for _, scenario := range scenarios {
+		if len(scenario.labels) != 0 {
+			lbls := scenario.deployObj.GetLabels()
 			if lbls == nil {
 				lbls = make(map[string]string)
 			}
 			for k, v := range testcase.labels {
 				lbls[k] = v
 			}
-			testcase.deployObj.SetLabels(lbls)
+			scenario.deployObj.SetLabels(lbls)
 		}
-		if len(testcase.annotations) != 0 {
-			anns := testcase.deployObj.GetAnnotations()
+		if len(scenario.annotations) != 0 {
+			anns := scenario.deployObj.GetAnnotations()
 			if anns == nil {
 				anns = make(map[string]string)
 			}
-			for k, v := range testcase.annotations {
+			for k, v := range scenario.annotations {
 				anns[k] = v
 			}
-			testcase.deployObj.SetAnnotations(anns)
+			scenario.deployObj.SetAnnotations(anns)
 		}
-		if testcase.finalizers != nil {
-			if len(testcase.finalizers) == 0 {
-				testcase.deployObj.SetFinalizers(nil)
+		if scenario.finalizers != nil {
+			if len(scenario.finalizers) == 0 {
+				scenario.deployObj.SetFinalizers(nil)
 			} else {
-				testcase.deployObj.SetFinalizers(testcase.finalizers)
+				scenario.deployObj.SetFinalizers(scenario.finalizers)
 			}
 		}
-		result, err := CreateOrMerge(ctx, klient, scheme.Scheme, testcase.deployObj)
-		if err != nil {
-			t.Errorf("%s: expected no error got %+v", testcase.it, err)
-		}
-		if err == nil && result != testcase.expected {
-			t.Errorf("%s: expected %q got %q", testcase.it, testcase.expected, result)
-		}
+		result, err := CreateOrMerge(ctx, klient, scheme.Scheme, scenario.deployObj)
+		assert.NoError(t, err)
+		assert.Equal(t, scenario.expected, result)
 	}
 }
 
