@@ -191,51 +191,45 @@ func TestGetAll(t *testing.T) {
 func TestGetForYAML(t *testing.T) {
 	t.Parallel()
 
-	var testcases = []struct {
+	var scenarios = []struct {
 		name               string
 		fixture            string
 		expectedObjectName string
 		isError            bool
 	}{
 		{
-			name:    "empty yaml should error",
+			name:    "should verify yaml with empty content errors out",
 			fixture: "testdata/empty.yaml",
 			isError: true,
 		},
 		{
-			name:    "non kubernetes yaml should error",
+			name:    "should verify yaml with non kubernetes schema errors out",
 			fixture: "testdata/non_kubernetes.yaml",
 			isError: true,
 		},
 		{
-			name:               "default namespace exists",
+			name:               "should verify yaml with default namespace exists",
 			fixture:            "testdata/default_namespace.yaml",
 			expectedObjectName: "default",
 		},
 		{
-			name:    "custom namespace does not exist",
+			name:    "should verify yaml with non-existing namespace errors out",
 			fixture: "testdata/custom_namespace.yaml",
 			isError: true,
 		},
 	}
 
-	for _, test := range testcases {
-		test := test // pin it
-		t.Run(test.name, func(t *testing.T) {
+	for _, scenario := range scenarios {
+		scenario := scenario // pin it
+		t.Run(scenario.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := GetForYAML(context.Background(), test.fixture)
-			if err != nil && !test.isError {
-				t.Fatalf("expected no error got: %+v", err)
-			}
-			if err == nil && test.isError {
-				t.Fatalf("expected error got none")
-			}
-			if test.isError {
-				return
-			}
-			if test.expectedObjectName != got.GetName() {
-				t.Fatalf("expected object name %q got %q", test.expectedObjectName, got.GetName())
+			got, err := GetForYAML(context.Background(), scenario.fixture)
+			if scenario.isError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, scenario.expectedObjectName, got.GetName())
 			}
 		})
 	}
