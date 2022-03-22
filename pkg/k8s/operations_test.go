@@ -693,19 +693,22 @@ func TestApplyWithDriftChecks(t *testing.T) {
 		toCompare client.Object // resource to be compared for drift check
 		isDrift   bool          // update verification
 	}
-	tests := []*testable{
+
+	// tests should be run serially i.e. one after the other
+	// in the given order
+	scenarios := []*testable{
 		{
-			name:      "should create the deployment & verify absence of drift",
+			name:      "should verify creation of the deployment & then verify absence of drift",
 			toApply:   deploy.DeepCopy(),
 			toCompare: deploy.DeepCopy(),
 		},
 		{
-			name:      "should not have issues by re-applying existing deployment & verify absence of drift",
+			name:      "should verify successful re-apply of the deployment & then verify absence of drift",
 			toApply:   deploy.DeepCopy(),
 			toCompare: deploy.DeepCopy(),
 		},
 		{
-			name: "should update existing deployment labels & verify presence of drift",
+			name: "should verify successful update of the deployment labels & then verify presence of drift",
 			toApply: &appsv1.Deployment{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Deployment",
@@ -724,7 +727,7 @@ func TestApplyWithDriftChecks(t *testing.T) {
 			isDrift:   true,
 		},
 		{
-			name: "should update existing deployment with annotations & verify presence of drift",
+			name: "should verify successful update of the deployment annotations & then verify presence of drift",
 			toApply: &appsv1.Deployment{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Deployment",
@@ -743,7 +746,7 @@ func TestApplyWithDriftChecks(t *testing.T) {
 			isDrift:   true,
 		},
 		{
-			name: "should not result in any drift with local state exactly same as cluster state",
+			name: "should verify absence of drift since local state matches cluster state",
 			toApply: &appsv1.Deployment{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Deployment",
@@ -753,10 +756,10 @@ func TestApplyWithDriftChecks(t *testing.T) {
 					Name:      deployName,
 					Namespace: "default",
 					Labels: map[string]string{
-						"foo-0": "bar-1", // value is changed
+						"foo-0": "bar-1", // value is un-changed from previous apply
 					},
 					Annotations: map[string]string{
-						"foo-0": "bar-1", // value is changed
+						"foo-0": "bar-1", // value is un-changed from previous apply
 					},
 				},
 				Spec: deploySpec,
@@ -780,7 +783,7 @@ func TestApplyWithDriftChecks(t *testing.T) {
 			},
 		},
 		{
-			name: "should update existing deployment with finalizers & verify absence of drift",
+			name: "should verify successful update of deployment with finalizers & then verify absence of drift",
 			toApply: &appsv1.Deployment{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Deployment",
@@ -812,31 +815,20 @@ func TestApplyWithDriftChecks(t *testing.T) {
 		},
 	}
 
-	for _, testcase := range tests {
-		testcase := testcase                      // pin name to avoid issues due to parallel run of testcases
-		t.Run(testcase.name, func(t *testing.T) { //
+	for _, scenario := range scenarios {
+		scenario := scenario
+		t.Run(scenario.name, func(t *testing.T) {
 			ctx := context.Background()
-			got, err := Apply(ctx, testcase.toApply)
-			if err != nil {
-				t.Errorf("expected no error while apply, got: %+v", err)
-			}
+			got, err := Apply(ctx, scenario.toApply)
+			assert.NoError(t, err)
 
 			// required before invoking drift against old state
-			testcase.toCompare.SetResourceVersion(got.GetResourceVersion())
-			// verify for difference w.r.t cluster state
-			isDrift, diff, err := HasDrifted(ctx, testcase.toCompare)
-			if err != nil {
-				t.Errorf("expected no error while checking for drift, got: %+v", err)
-			}
-			if testcase.isDrift != isDrift {
-				t.Errorf(
-					"expected drift '%t', got '%t': diff '%t': -actual + expected \n%s",
-					testcase.isDrift,
-					isDrift,
-					diff != "",
-					diff,
-				)
-			}
+			scenario.toCompare.SetResourceVersion(got.GetResourceVersion())
+
+			// verify for difference from cluster state
+			isDrift, diff, err := HasDrifted(ctx, scenario.toCompare)
+			assert.NoError(t, err)
+			assert.Equal(t, scenario.isDrift, isDrift, "-actual + result \n%s", diff)
 		})
 	}
 }
