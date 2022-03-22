@@ -24,7 +24,7 @@ func runMain(m *testing.M) int {
 
 	testEnv := &envtest.Environment{
 		UseExistingCluster: pointer.Bool(false), // use local binaries i.e. etcd & apiserver
-		// AttachControlPlaneOutput: true,
+		// AttachControlPlaneOutput: true, // this is too verbose
 	}
 	cfg, err = testEnv.Start()
 	if err != nil {
@@ -38,14 +38,16 @@ func runMain(m *testing.M) int {
 		}
 	}()
 
-	// init the Kubernetes client to invoke APIs
+	// initialise the Kubernetes client needed to invoke K8s APIs
+	// Note: This is a global variable
 	klient, err = client.New(cfg, client.Options{})
 	if err != nil {
 		fmt.Println(err)
 		return 1
 	}
 
-	// init Kubernetes scheme that has all native schemas registered
+	// initialise Kubernetes scheme that has all native schemas registered
+	// Note: This is a global variable
 	rscheme = scheme.Scheme
 
 	err = RegisterBaseRunOptions(&RunOptions{
@@ -56,6 +58,9 @@ func runMain(m *testing.M) int {
 		fmt.Println(err)
 		return 1
 	}
+
+	// Trigger to execute all functions starting with Test*
+	// found in ./*_test.go files
 	return m.Run()
 }
 
