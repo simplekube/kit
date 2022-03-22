@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/simplekube/kit/pkg/pointer"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
