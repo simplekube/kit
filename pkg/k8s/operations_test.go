@@ -307,12 +307,12 @@ func TestGetForAllYAMLs(t *testing.T) {
 func TestDryRun(t *testing.T) {
 	t.Parallel()
 
-	var testcases = []struct {
+	var scenarios = []struct {
 		name     string
 		resource client.Object
 	}{
 		{
-			name: "should dry run a configmap",
+			name: "should verify successful dry run of the configmap",
 			resource: &corev1.ConfigMap{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "ConfigMap",
@@ -325,7 +325,7 @@ func TestDryRun(t *testing.T) {
 			},
 		},
 		{
-			name: "should dry run a deployment",
+			name: "should verify successful dry run of the deployment",
 			resource: &appsv1.Deployment{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Deployment",
@@ -359,24 +359,17 @@ func TestDryRun(t *testing.T) {
 		},
 	}
 
-	for _, test := range testcases {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
+	for _, scenario := range scenarios {
+		scenario := scenario // pin it
+		t.Run(scenario.name, func(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
-			got, err := DryRun(ctx, test.resource)
-			if err != nil {
-				t.Errorf("expected no error got: %+v", err)
-			}
-			isEqual, err := IsEqual(got, test.resource)
-			if err != nil {
-				t.Errorf("expected no error got: %+v", err)
-			}
-			if !isEqual {
-				diff := cmp.Diff(got, test.resource)
-				t.Errorf("expected no diff got:  -got +want\n%s\n", diff)
-			}
+			got, err := DryRun(ctx, scenario.resource)
+			assert.NoError(t, err)
+			isEqual, err := IsEqual(got, scenario.resource)
+			assert.NoError(t, err)
+			assert.True(t, isEqual)
 		})
 	}
 }
