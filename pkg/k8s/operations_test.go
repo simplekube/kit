@@ -111,14 +111,14 @@ func TestGet(t *testing.T) {
 func TestGetAll(t *testing.T) {
 	t.Parallel()
 
-	var testcases = []struct {
+	var scenarios = []struct {
 		name                string
 		objects             []client.Object
 		expectedObjectNames []string
 		isError             bool
 	}{
 		{
-			name: "default namespace exists",
+			name: "should verify existence of default namespace",
 			objects: []client.Object{
 				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
@@ -129,7 +129,7 @@ func TestGetAll(t *testing.T) {
 			expectedObjectNames: []string{"default"},
 		},
 		{
-			name: "can not get without a namespace",
+			name: "should verify configmap can not be fetched without a namespace",
 			objects: []client.Object{
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
@@ -140,7 +140,8 @@ func TestGetAll(t *testing.T) {
 			isError: true,
 		},
 		{
-			name: "default service account does not exist",
+			// Note: Since local k8s binaries are used for testing
+			name: "should verify non existence of default service account",
 			objects: []client.Object{
 				&corev1.ServiceAccount{
 					ObjectMeta: metav1.ObjectMeta{
@@ -152,7 +153,7 @@ func TestGetAll(t *testing.T) {
 			isError: true,
 		},
 		{
-			name: "none namespace does not exist",
+			name: "should verify non existence of 'none' namespace",
 			objects: []client.Object{
 				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
@@ -164,28 +165,24 @@ func TestGetAll(t *testing.T) {
 		},
 	}
 
-	for _, test := range testcases {
-		test := test // pin it
-		t.Run(test.name, func(t *testing.T) {
+	for _, scenario := range scenarios {
+		scenario := scenario // pin it
+		t.Run(scenario.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := GetAll(context.Background(), test.objects)
-			if err != nil && !test.isError {
-				t.Fatalf("expected no error got: %+v", err)
-			}
-			if err == nil && test.isError {
-				t.Fatalf("expected error got none")
-			}
-			if test.isError {
-				return
-			}
-			var expectedNameSet = sets.NewString(test.expectedObjectNames...)
-			var actualNameSet = sets.String{}
-			for _, g := range got {
-				actualNameSet.Insert(g.GetName())
-			}
-			if !actualNameSet.Equal(expectedNameSet) {
-				t.Fatalf("names not found: %v", expectedNameSet.Difference(actualNameSet))
+			got, err := GetAll(context.Background(), scenario.objects)
+			if scenario.isError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				var expectedNameSet = sets.NewString(scenario.expectedObjectNames...)
+				var actualNameSet = sets.String{}
+				for _, g := range got {
+					actualNameSet.Insert(g.GetName())
+				}
+				assert.Condition(t, func() (success bool) {
+					return actualNameSet.Equal(expectedNameSet)
+				})
 			}
 		})
 	}
