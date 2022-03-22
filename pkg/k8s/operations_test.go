@@ -66,14 +66,14 @@ func TestGetKindVersionForObject(t *testing.T) {
 func TestGet(t *testing.T) {
 	t.Parallel()
 
-	var testcases = []struct {
+	var scenarios = []struct {
 		name               string
 		object             client.Object
 		expectedObjectName string
 		isError            bool
 	}{
 		{
-			name: "default namespace exists",
+			name: "should verify existence of default namespace",
 			object: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "default",
@@ -82,7 +82,7 @@ func TestGet(t *testing.T) {
 			expectedObjectName: "default",
 		},
 		{
-			name: "none namespace does not exist",
+			name: "should verify non existence of 'none' namespace",
 			object: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "none",
@@ -92,23 +92,17 @@ func TestGet(t *testing.T) {
 		},
 	}
 
-	for _, test := range testcases {
-		test := test // pin it
-		t.Run(test.name, func(t *testing.T) {
+	for _, scenario := range scenarios {
+		scenario := scenario // pin it
+		t.Run(scenario.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := Get(context.Background(), test.object)
-			if err != nil && !test.isError {
-				t.Fatalf("expected no error got: %+v", err)
-			}
-			if err == nil && test.isError {
-				t.Fatalf("expected error got none")
-			}
-			if test.isError {
-				return
-			}
-			if test.expectedObjectName != got.GetName() {
-				t.Fatalf("expected object name %q got %q", test.expectedObjectName, got.GetName())
+			got, err := Get(context.Background(), scenario.object)
+			if scenario.isError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, scenario.expectedObjectName, got.GetName())
 			}
 		})
 	}
