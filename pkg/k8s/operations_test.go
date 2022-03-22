@@ -377,9 +377,7 @@ func TestDryRun(t *testing.T) {
 func TestHasDrifted(t *testing.T) {
 	t.Parallel()
 
-	var (
-		nsName = fmt.Sprintf("test-has-drifted-%d", rand.Int31())
-	)
+	var nsName = fmt.Sprintf("test-has-drifted-%d", rand.Int31())
 	var ns = &corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Namespace",
@@ -390,18 +388,17 @@ func TestHasDrifted(t *testing.T) {
 		},
 	}
 	_, err := Create(context.Background(), ns)
-	if err != nil {
-		t.Errorf("expected no error got: %+v", err)
-	}
+	assert.NoError(t, err)
 
-	var testcases = []struct {
+	// Note: These scenarios must run serially i.e. one after the other
+	var scenarios = []struct {
 		name       string
 		resource   client.Object
 		preDriftFn func(obj client.Object) error // is run before invoking drift
 		isDrift    bool
 	}{
 		{
-			name: "verify absence of drift when local namespace instance matches the cluster instance",
+			name: "should verify absence of drift when local state matches the cluster state",
 			resource: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Namespace",
@@ -413,7 +410,7 @@ func TestHasDrifted(t *testing.T) {
 			},
 		},
 		{
-			name: "add label to the local namespace instance & verify presence of drift",
+			name: "should add label to the local state & verify presence of drift",
 			resource: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Namespace",
@@ -429,7 +426,7 @@ func TestHasDrifted(t *testing.T) {
 			isDrift: true,
 		},
 		{
-			name: "update label against the cluster namespace instance & then verify absence of drift",
+			name: "should update label against the cluster state & then verify absence of drift",
 			resource: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Namespace",
@@ -449,7 +446,7 @@ func TestHasDrifted(t *testing.T) {
 			},
 		},
 		{
-			name: "provide a local namespace instance same as cluster instance instance & then verify absence of drift",
+			name: "should verify absence of drift since local state matches the cluster state",
 			resource: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Namespace",
@@ -464,7 +461,7 @@ func TestHasDrifted(t *testing.T) {
 			},
 		},
 		{
-			name: "update existing label to the local namespace instance & then verify presence of drift",
+			name: "should verify presence of drift since label of local state does not match to that of cluster state",
 			resource: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Namespace",
@@ -480,7 +477,7 @@ func TestHasDrifted(t *testing.T) {
 			isDrift: true,
 		},
 		{
-			name: "add finalizers to the local namespace instance & verify presence of drift",
+			name: "should verify presence of drift since local state has finalizers while cluster state does not",
 			resource: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Namespace",
@@ -497,7 +494,7 @@ func TestHasDrifted(t *testing.T) {
 			isDrift: true,
 		},
 		{
-			name: "update finalizers to the cluster namespace instance & then verify absence of drift",
+			name: "should verify absence of drift since cluster state is updated with finalizers & hence matches local state",
 			resource: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Namespace",
@@ -518,7 +515,7 @@ func TestHasDrifted(t *testing.T) {
 			},
 		},
 		{
-			name: "use a finalizer in the local namespace instance that is also present in cluster instance & then verify absence of drift",
+			name: "should verify absence of drift since the finalizer used in local state matches that of cluster state",
 			resource: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Namespace",
@@ -534,28 +531,16 @@ func TestHasDrifted(t *testing.T) {
 		},
 	}
 
-	for _, test := range testcases {
+	for _, test := range scenarios {
 		test := test
 		t.Run(test.name, func(t *testing.T) { // tests should be executed in serial order
 			if test.preDriftFn != nil {
 				err := test.preDriftFn(test.resource)
-				if err != nil {
-					t.Errorf("expected no error during update, got: %+v", err)
-				}
+				assert.NoError(t, err)
 			}
 			isDrift, diff, err := HasDrifted(context.Background(), test.resource)
-			if err != nil {
-				t.Errorf("expected no error while checking for drift, got: %+v", err)
-			}
-			if test.isDrift != isDrift {
-				t.Errorf(
-					"expected drift '%t', got '%t': diff '%t': -actual +expected\n%s",
-					test.isDrift,
-					isDrift,
-					diff != "",
-					diff,
-				)
-			}
+			assert.NoError(t, err)
+			assert.Equal(t, test.isDrift, isDrift, "-want +got\n%s", diff)
 		})
 	}
 }
