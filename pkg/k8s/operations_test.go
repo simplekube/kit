@@ -6,7 +6,8 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/simplekube/kit/pkg/pointer"
+	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,7 +20,7 @@ import (
 func TestGetKindVersionForObject(t *testing.T) {
 	t.Parallel()
 
-	var testcases = []struct {
+	var scenarios = []struct {
 		name            string
 		object          client.Object
 		expectedKind    string
@@ -27,7 +28,7 @@ func TestGetKindVersionForObject(t *testing.T) {
 		isError         bool
 	}{
 		{
-			name: "should get the kind & version of kubernetes configmap",
+			name: "should fetch the kind & version of kubernetes configmap",
 			object: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "howdy",
@@ -45,26 +46,18 @@ func TestGetKindVersionForObject(t *testing.T) {
 		},
 	}
 
-	for _, test := range testcases {
-		test := test // pin it
-		t.Run(test.name, func(t *testing.T) {
+	for _, scenario := range scenarios {
+		scenario := scenario // pin it
+		t.Run(scenario.name, func(t *testing.T) {
 			t.Parallel()
 
-			k, v, err := GetKindVersionForObject(test.object, rscheme)
-			if err != nil && !test.isError {
-				t.Fatalf("expected no error got: %+v", err)
-			}
-			if err == nil && test.isError {
-				t.Fatal("expected error: got none")
-			}
-			if test.isError {
-				return
-			}
-			if k != test.expectedKind {
-				t.Fatalf("expected kind %q got %q", test.expectedKind, k)
-			}
-			if v != test.expectedVersion {
-				t.Fatalf("expected version %q got %q", test.expectedVersion, v)
+			k, v, err := GetKindVersionForObject(scenario.object, rscheme)
+			if scenario.isError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, scenario.expectedKind, k)
+				assert.Equal(t, scenario.expectedVersion, v)
 			}
 		})
 	}
