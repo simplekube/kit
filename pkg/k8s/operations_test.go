@@ -238,71 +238,67 @@ func TestGetForYAML(t *testing.T) {
 func TestGetForAllYAMLs(t *testing.T) {
 	t.Parallel()
 
-	var testcases = []struct {
+	var scenarios = []struct {
 		name                string
 		fixtures            []string
 		expectedObjectNames []string
 		isError             bool
 	}{
 		{
-			name:     "empty yaml should error",
+			name:     "should verify yaml with empty content errors out",
 			fixtures: []string{"testdata/empty.yaml"},
 			isError:  true,
 		},
 		{
-			name:     "non kubernetes yaml should error",
+			name:     "should verify yaml with non kubernetes schema errors out",
 			fixtures: []string{"testdata/non_kubernetes.yaml"},
 			isError:  true,
 		},
 		{
-			name:     "invalid kubernetes yaml should error",
+			name:     "should verify yaml with invalid kubernetes schema errors out",
 			fixtures: []string{"testdata/invalid_kubernetes.yaml"},
 			isError:  true,
 		},
 		{
-			name:     "non kubernetes & kubernetes yaml should error",
+			name:     "should verify yaml with non kubernetes & kubernetes schema errors out",
 			fixtures: []string{"testdata/non_kubernetes_and_custom_namespace.yaml"},
 			isError:  true,
 		},
 		{
-			name:                "default namespace exists",
+			name:                "should verify yaml with default namespace exists",
 			fixtures:            []string{"testdata/default_namespace.yaml"},
 			expectedObjectNames: []string{"default"},
 		},
 		{
-			name:     "custom namespace does not exist",
+			name:     "should verify yaml with non-existing namespace errors out",
 			fixtures: []string{"testdata/custom_namespace.yaml"},
 			isError:  true,
 		},
 		{
-			name:     "list of custom namespaces do not exist",
+			name:     "verify yaml with a list of non-existent namespaces errors out",
 			fixtures: []string{"testdata/custom_namespace_list.yaml"},
 			isError:  true,
 		},
 	}
 
-	for _, test := range testcases {
-		test := test // pin it
-		t.Run(test.name, func(t *testing.T) {
+	for _, scenario := range scenarios {
+		scenario := scenario // pin it
+		t.Run(scenario.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := GetForAllYAMLs(context.Background(), test.fixtures)
-			if err != nil && !test.isError {
-				t.Fatalf("expected no error got: %+v", err)
-			}
-			if err == nil && test.isError {
-				t.Fatalf("expected error got none")
-			}
-			if test.isError {
-				return
-			}
-			var expectedNameSet = sets.NewString(test.expectedObjectNames...)
-			var actualNameSet = sets.String{}
-			for _, g := range got {
-				actualNameSet.Insert(g.GetName())
-			}
-			if !actualNameSet.Equal(expectedNameSet) {
-				t.Fatalf("names not found: %v", expectedNameSet.Difference(actualNameSet))
+			got, err := GetForAllYAMLs(context.Background(), scenario.fixtures)
+			if scenario.isError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				var expectedNameSet = sets.NewString(scenario.expectedObjectNames...)
+				var actualNameSet = sets.String{}
+				for _, g := range got {
+					actualNameSet.Insert(g.GetName())
+				}
+				assert.Condition(t, func() (success bool) {
+					return actualNameSet.Equal(expectedNameSet)
+				})
 			}
 		})
 	}
