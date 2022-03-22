@@ -549,12 +549,12 @@ func TestApply(t *testing.T) {
 	t.Parallel()
 
 	var nsName = fmt.Sprintf("test-apply-%d", rand.Int31())
-	var testcases = []struct {
+	var scenarios = []struct {
 		name     string
 		resource client.Object
 	}{
 		{
-			name: "should create a namespace",
+			name: "should verify creation of namespace",
 			resource: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Namespace",
@@ -566,7 +566,7 @@ func TestApply(t *testing.T) {
 			},
 		},
 		{
-			name: "should update the namespace with labels",
+			name: "should verify namespace was updated with labels",
 			resource: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Namespace",
@@ -581,7 +581,7 @@ func TestApply(t *testing.T) {
 			},
 		},
 		{
-			name: "should update the namespace with annotations",
+			name: "should verify namespace was updated with annotations",
 			resource: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Namespace",
@@ -596,7 +596,7 @@ func TestApply(t *testing.T) {
 			},
 		},
 		{
-			name: "should update the namespace with finalizers",
+			name: "should verify namespace was updated with finalizers",
 			resource: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Namespace",
@@ -611,7 +611,7 @@ func TestApply(t *testing.T) {
 			},
 		},
 		{
-			name: "no issues if state to be applied matches the cluster state",
+			name: "should verify local state matches the cluster state",
 			resource: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Namespace",
@@ -633,20 +633,14 @@ func TestApply(t *testing.T) {
 		},
 	}
 
-	for _, test := range testcases {
-		test := test                          // pin it for parallel tests to be executed without issues
+	for _, test := range scenarios {
+		test := test
 		t.Run(test.name, func(t *testing.T) { // tests should be run in serial order
 			got, err := Apply(context.Background(), test.resource)
-			if err != nil {
-				t.Errorf("expected no error, got: %+v", err)
-			}
+			assert.NoError(t, err)
 			isEqual, diff, err := IsEqualWithDiffOutput(got, test.resource)
-			if err != nil {
-				t.Errorf("expected no error while checking for equality, got: %+v", err)
-			}
-			if !isEqual {
-				t.Errorf("expected local state equal to cluster state, got diff: -cluster +local\n%s", diff)
-			}
+			assert.NoError(t, err)
+			assert.Equal(t, true, isEqual, "-cluster +local\n%s", diff)
 		})
 	}
 }
