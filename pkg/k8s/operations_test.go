@@ -964,7 +964,7 @@ func TestCreateOrMerge(t *testing.T) {
 			if lbls == nil {
 				lbls = make(map[string]string)
 			}
-			for k, v := range testcase.labels {
+			for k, v := range scenario.labels {
 				lbls[k] = v
 			}
 			scenario.deployObj.SetLabels(lbls)
