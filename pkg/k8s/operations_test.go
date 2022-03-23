@@ -959,36 +959,39 @@ func TestCreateOrMerge(t *testing.T) {
 		}
 	}()
 	for _, scenario := range scenarios {
-		if len(scenario.labels) != 0 {
-			lbls := scenario.deployObj.GetLabels()
-			if lbls == nil {
-				lbls = make(map[string]string)
+		scenario := scenario
+		t.Run(scenario.it, func(t *testing.T) {
+			if len(scenario.labels) != 0 {
+				lbls := scenario.deployObj.GetLabels()
+				if lbls == nil {
+					lbls = make(map[string]string)
+				}
+				for k, v := range scenario.labels {
+					lbls[k] = v
+				}
+				scenario.deployObj.SetLabels(lbls)
 			}
-			for k, v := range scenario.labels {
-				lbls[k] = v
+			if len(scenario.annotations) != 0 {
+				anns := scenario.deployObj.GetAnnotations()
+				if anns == nil {
+					anns = make(map[string]string)
+				}
+				for k, v := range scenario.annotations {
+					anns[k] = v
+				}
+				scenario.deployObj.SetAnnotations(anns)
 			}
-			scenario.deployObj.SetLabels(lbls)
-		}
-		if len(scenario.annotations) != 0 {
-			anns := scenario.deployObj.GetAnnotations()
-			if anns == nil {
-				anns = make(map[string]string)
+			if scenario.finalizers != nil {
+				if len(scenario.finalizers) == 0 {
+					scenario.deployObj.SetFinalizers(nil)
+				} else {
+					scenario.deployObj.SetFinalizers(scenario.finalizers)
+				}
 			}
-			for k, v := range scenario.annotations {
-				anns[k] = v
-			}
-			scenario.deployObj.SetAnnotations(anns)
-		}
-		if scenario.finalizers != nil {
-			if len(scenario.finalizers) == 0 {
-				scenario.deployObj.SetFinalizers(nil)
-			} else {
-				scenario.deployObj.SetFinalizers(scenario.finalizers)
-			}
-		}
-		result, err := CreateOrMerge(ctx, klient, scheme.Scheme, scenario.deployObj)
-		assert.NoError(t, err)
-		assert.Equal(t, scenario.expected, result)
+			result, err := CreateOrMerge(ctx, klient, scheme.Scheme, scenario.deployObj)
+			assert.NoError(t, err)
+			assert.Equal(t, scenario.expected, result)
+		})
 	}
 }
 
