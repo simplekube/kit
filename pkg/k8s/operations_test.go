@@ -996,6 +996,8 @@ func TestCreateOrMerge(t *testing.T) {
 }
 
 func TestObjectEqual(t *testing.T) {
+	t.Parallel()
+
 	deployObj := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
@@ -1030,17 +1032,20 @@ func TestObjectEqual(t *testing.T) {
 	}
 
 	type testable struct {
+		name     string
 		observed client.Object
 		desired  client.Object
 		isEqual  bool
 	}
-	tests := map[string]testable{
-		"observed equals desired deployment": {
+	scenarios := []testable{
+		{
+			name:     "is equal if observed deployment state equals desired state",
 			observed: deployObj.DeepCopy(),
 			desired:  deployObj.DeepCopy(),
 			isEqual:  true,
 		},
-		"observed is superset of desired deployment": {
+		{
+			name: "is equal if observed deployment state is superset of desired state",
 			observed: &appsv1.Deployment{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Deployment",
@@ -1089,7 +1094,8 @@ func TestObjectEqual(t *testing.T) {
 			desired: deployObj.DeepCopy(),
 			isEqual: true,
 		},
-		"desired is superset of observed deployment": {
+		{
+			name:     "is not equal when desired deployment state is a superset of observed state",
 			observed: deployObj.DeepCopy(),
 			desired: &appsv1.Deployment{
 				TypeMeta: metav1.TypeMeta{
@@ -1137,13 +1143,13 @@ func TestObjectEqual(t *testing.T) {
 			isEqual: false,
 		},
 	}
-	for name, testcase := range tests {
-		isEqual, err := IsEqual(testcase.observed, testcase.desired)
-		if err != nil {
-			t.Errorf("%s: expected no error got %+v", name, err)
-		}
-		if err == nil && isEqual != testcase.isEqual {
-			t.Errorf("%s: expected %t got %t", name, testcase.isEqual, isEqual)
-		}
+	for _, scenario := range scenarios {
+		scenario := scenario // pin it
+		t.Run(scenario.name, func(t *testing.T) {
+			t.Parallel()
+			isEqual, err := IsEqual(scenario.observed, scenario.desired)
+			assert.NoError(t, err)
+			assert.Equal(t, scenario.isEqual, isEqual)
+		})
 	}
 }
