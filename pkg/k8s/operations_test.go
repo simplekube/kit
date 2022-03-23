@@ -866,7 +866,7 @@ func TestCreateOrMerge(t *testing.T) {
 	}
 
 	type testable struct {
-		it          string
+		name        string
 		deployObj   *appsv1.Deployment
 		annotations map[string]string
 		labels      map[string]string
@@ -877,17 +877,17 @@ func TestCreateOrMerge(t *testing.T) {
 	// in the given order
 	scenarios := []*testable{
 		{
-			it:        "should verify successful creation of the deployment",
+			name:      "should verify successful creation of the deployment",
 			deployObj: deploy.DeepCopy(),
 			expected:  OperationResultCreated,
 		},
 		{
-			it:        "should verify no change to cluster state since it matches the local state",
+			name:      "should verify no change to cluster state since it matches the local state",
 			deployObj: deploy.DeepCopy(),
 			expected:  OperationResultNone,
 		},
 		{
-			it:        "should verify successful update of the deployment with labels",
+			name:      "should verify successful update of the deployment with labels",
 			deployObj: deploy.DeepCopy(),
 			labels: map[string]string{
 				"foo-1": "bar-1",
@@ -895,7 +895,7 @@ func TestCreateOrMerge(t *testing.T) {
 			expected: OperationResultUpdatedResourceOnly,
 		},
 		{
-			it:        "should verify successful update of the deployment with annotations",
+			name:      "should verify successful update of the deployment with annotations",
 			deployObj: deploy.DeepCopy(),
 			annotations: map[string]string{
 				"foo-1": "bar-1",
@@ -903,7 +903,7 @@ func TestCreateOrMerge(t *testing.T) {
 			expected: OperationResultUpdatedResourceOnly,
 		},
 		{
-			it:        "should verify no change in cluster state since its labels & annotations matches the local state",
+			name:      "should verify no change in cluster state since its labels & annotations matches the local state",
 			deployObj: deploy.DeepCopy(),
 			annotations: map[string]string{
 				"foo-1": "bar-1", // no change
@@ -914,7 +914,7 @@ func TestCreateOrMerge(t *testing.T) {
 			expected: OperationResultNone,
 		},
 		{
-			it:        "should verify successful update of the deployment with finalizers",
+			name:      "should verify successful update of the deployment with finalizers",
 			deployObj: deploy.DeepCopy(),
 			finalizers: []string{
 				"protect.io/storage",
@@ -923,7 +923,7 @@ func TestCreateOrMerge(t *testing.T) {
 			expected: OperationResultUpdatedResourceOnly,
 		},
 		{
-			it:        "should verify successful update of the deployment by updating the finalizers",
+			name:      "should verify successful update of the deployment by updating the finalizers",
 			deployObj: deploy.DeepCopy(),
 			finalizers: []string{
 				"protect.io/storage",
@@ -931,7 +931,7 @@ func TestCreateOrMerge(t *testing.T) {
 			expected: OperationResultUpdatedResourceOnly,
 		},
 		{
-			it:        "should verify no change to cluster state since its labels, annotations & finalizers matches the local state",
+			name:      "should verify no change to cluster state since its labels, annotations & finalizers matches the local state",
 			deployObj: deploy.DeepCopy(),
 			finalizers: []string{
 				"protect.io/storage", // no new change
@@ -960,7 +960,7 @@ func TestCreateOrMerge(t *testing.T) {
 	}()
 	for _, scenario := range scenarios {
 		scenario := scenario
-		t.Run(scenario.it, func(t *testing.T) {
+		t.Run(scenario.name, func(t *testing.T) {
 			if len(scenario.labels) != 0 {
 				lbls := scenario.deployObj.GetLabels()
 				if lbls == nil {
