@@ -8,6 +8,10 @@ import (
 
 // credit: https://github.com/banzaicloud/k8s-objectmatcher/blob/master/patch/deletenull.go
 
+// Note: Usage: Null operations is helpful for scenarios where setting fields
+// to null enables other operations to discard these fields from
+// latter's code path
+
 // func init() {
 // 	// k8s.io/apimachinery/pkg/util/intstr.IntOrString behaves really badly
 // 	// from JSON marshaling point of view, name can't be empty basically.
