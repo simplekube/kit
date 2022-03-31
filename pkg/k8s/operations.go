@@ -670,7 +670,7 @@ func ThreeWayLocalMergeWithTwoObjects(observed, desired map[string]interface{}) 
 	return ThreeWayLocalMerge(observed, runtime.DeepCopyJSON(desired), desired)
 }
 
-// ComparableObjectsForDeepEqual merges the provided desired state with the
+// ToComparableObjects merges the provided desired state with the
 // provided observed state to form a merged state. As the function name
 // suggests, this is useful before running DeepEqual check.
 //
@@ -682,35 +682,35 @@ func ThreeWayLocalMergeWithTwoObjects(observed, desired map[string]interface{}) 
 // a subset of the observed state.
 // - Merged state takes care of Kubernetes read only system fields by copying
 // them from the observed state into the merged state
-func ComparableObjectsForDeepEqual(observed, desired client.Object) (observedObj *unstructured.Unstructured, mergedObj *unstructured.Unstructured, err error) {
+func ToComparableObjects(observed, desired client.Object) (observedObj, mergedObj *unstructured.Unstructured, err error) {
 	if observed == nil {
-		return nil, nil, errors.New("nil observed: cannot run equality check")
+		return nil, nil, errors.New("nil observed")
 	}
 	if desired == nil {
-		return nil, nil, errors.New("nil desired: cannot run equality check")
+		return nil, nil, errors.New("nil desired")
 	}
 	observedUnstruct, err := runtime.DefaultUnstructuredConverter.ToUnstructured(observed.DeepCopyObject())
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to convert observed state to unstructured")
+		return nil, nil, errors.Wrap(err, "convert observed to unstructured")
 	}
 	desiredUnstruct, err := runtime.DefaultUnstructuredConverter.ToUnstructured(desired.DeepCopyObject())
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to convert desired state to unstructured")
+		return nil, nil, errors.Wrap(err, "convert desired to unstructured")
 	}
 
-	// remove null type entries from the desired instance
+	// Remove null entries from the desired instance
 	//
-	// Note: Not doing so creates unneeded diffs between
+	// Note: Not doing so creates false diffs between
 	// merged & observed instances
-	desiredUnstruct, err = DeleteNullInUnstruct(desiredUnstruct)
+	desiredUnstruct, err = DeleteNullInUnstructuredMap(desiredUnstruct)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to remove null from desired state")
+		return nil, nil, errors.Wrap(err, "remove null from desired")
 	}
 
-	// 3-way client side merge
+	// 3-way client side merge of desired & observed to derive the merged state
 	mergedUnstruct, err := ThreeWayLocalMergeWithTwoObjects(observedUnstruct, desiredUnstruct)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to merge desired to observed state")
+		return nil, nil, err
 	}
 
 	// var mergedObj, observedObj unstructured.Unstructured
@@ -718,24 +718,25 @@ func ComparableObjectsForDeepEqual(observed, desired client.Object) (observedObj
 	mergedObj = &unstructured.Unstructured{}
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(mergedUnstruct, mergedObj)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to create merged object from unstructured")
+		return nil, nil, errors.Wrap(err, "create merged from unstructured")
 	}
+
 	// Set TypeMeta info against observed instance since they are missing in
 	// observed instance
 	observedUnstruct["kind"] = mergedObj.GetKind()
 	observedUnstruct["apiVersion"] = mergedObj.GetAPIVersion()
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(observedUnstruct, observedObj)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to create observed object from unstructured")
+		return nil, nil, errors.Wrap(err, "create observed from unstructured")
 	}
 
-	// Ensure read-only system fields are taken care of in merged instance
-	// by copying them from observed instance.
+	// Ensure read-only system fields are copied into merged instance
+	// from observed instance. This removes false diffs while comparing
+	// these two instance
 	//
 	// Note: Observed instance i.e. the state found in Kubernetes cluster,
 	// is assumed to have these system fields
 	overrideObjectMetaSystemFields(mergedObj, observedObj)
-
 	return observedObj, mergedObj, nil
 }
 
@@ -749,7 +750,7 @@ func ComparableObjectsForDeepEqual(observed, desired client.Object) (observedObj
 // - Comparison is purely a client side implementation i.e. Kubernetes APIs
 // are not involved in the process
 func IsEqualWithMergeOutput(observed, desired client.Object) (bool, *unstructured.Unstructured, error) {
-	observedObj, mergedObj, err := ComparableObjectsForDeepEqual(observed, desired)
+	observedObj, mergedObj, err := ToComparableObjects(observed, desired)
 	if err != nil {
 		return false, nil, err
 	}
@@ -768,7 +769,7 @@ func IsEqualWithMergeOutput(observed, desired client.Object) (bool, *unstructure
 // are not involved in the process
 // - Diff response is formatted as -observed +merged
 func IsEqualWithDiffOutput(observed, desired client.Object) (bool, string, error) {
-	observedObj, mergedObj, err := ComparableObjectsForDeepEqual(observed, desired)
+	observedObj, mergedObj, err := ToComparableObjects(observed, desired)
 	if err != nil {
 		return false, "", err
 	}
