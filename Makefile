@@ -9,26 +9,29 @@ FILES ?= ./...
 GOPKGS ?= $(shell go list $(FILES) | grep -v /vendor/)
 GOFILES ?= $(shell find . -name '*.go' | grep -v /vendor/)
 
-# Tags specific for building
+# Tags specific to build the binary
 GOTAGS ?=
 
 NAME := $(notdir $(shell pwd))
 
-## Runs all of the required cleaning and verification targets.
-all: mod-download dev-dependencies tidy fmt fiximports test
+## Default target
+all: test
 .PHONY: all
 
-tidy: ## Cleans the Go module.
+## Clean up project's Go modules
+tidy:
 	@echo "==> Tidying module"
 	@go mod tidy
 .PHONY: tidy
 
-mod-download: ## Downloads the Go module.
+## Download project's Go modules
+mod-download:
 	@echo "==> Downloading Go module"
 	@go mod download
 .PHONY: mod-download
 
-dev-dependencies: ## Downloads the necessesary dev dependencies.
+## Download necessary dev dependencies
+dev-dependencies:
 	@echo "==> Downloading development dependencies"
 	@go install honnef.co/go/tools/cmd/staticcheck@latest
 	@go install golang.org/x/tools/cmd/goimports@latest
@@ -51,23 +54,26 @@ test-full: ## Runs the tests with VCR disabled (i.e., makes external calls).
 		'go test -timeout=60s -parallel=20 ${GOPKGS} ${TESTARGS}'
 .PHONY: test-full
 
-
-fiximports: ## Properly formats and orders imports.
+## Properly formats and orders imports
+fiximports:
 	@echo "==> Fixing imports"
 	@goimports -w {pkg,}
 .PHONY: fiximports
 
-fmt: ## Properly formats Go files and orders dependencies.
+## Format Go files
+fmt:
 	@echo "==> Running gofmt"
 	@gofmt -s -w ${GOFILES}
 .PHONY: fmt
 
-vet: ## Identifies common errors.
+## Identify common errors
+vet:
 	@echo "==> Running go vet"
 	@go vet ./...
 .PHONY: vet
 
-staticcheck: ## Runs the staticcheck linter.
+## Run staticcheck linter
+staticcheck:
 	@echo "==> Running staticcheck"
 	@staticcheck ./...
 .PHONY: staticcheck
