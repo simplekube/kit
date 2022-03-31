@@ -398,13 +398,13 @@ func Assert(ctx context.Context, expected client.Object, assertOptions AssertOpt
 		if actual == nil {
 			result = true // assert succeeded
 		} else {
-			diff = "found the resource while expecting none"
+			diff = "found a resource while expecting none"
 		}
 	case AssertTypeIsFound:
 		if actual != nil {
 			result = true // assert succeeded
 		} else {
-			diff = "expected resource was not found while expecting one"
+			diff = "resource was not found while expecting one"
 		}
 	case AssertTypeIsCustom:
 		if assertOptions.CustomAssertFn != nil {
