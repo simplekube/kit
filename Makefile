@@ -51,17 +51,6 @@ test-full: ## Runs the tests with VCR disabled (i.e., makes external calls).
 		'go test -timeout=60s -parallel=20 ${GOPKGS} ${TESTARGS}'
 .PHONY: test-full
 
-check-imports: ## A check which lists improperly-formatted imports, if they exist.
-	@$(shell pwd)/scripts/check-imports.sh
-.PHONY: check-imports
-
-check-fmt: ## A check which lists improperly-formatted files, if they exist.
-	@$(shell pwd)/scripts/check-gofmt.sh
-.PHONY: check-fmt
-
-check-mod: ## A check which lists extraneous dependencies, if they exist.
-	@$(shell pwd)/scripts/check-mod.sh
-.PHONY: check-mod
 
 fiximports: ## Properly formats and orders imports.
 	@echo "==> Fixing imports"
