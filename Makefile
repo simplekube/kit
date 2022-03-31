@@ -37,17 +37,20 @@ dev-dependencies:
 	@go install golang.org/x/tools/cmd/goimports@latest
 .PHONY: dev-dependencies
 
-test: vet staticcheck ## Runs the test suite with VCR mocks enabled.
+## Runs the test suite with VCR mocks enabled.
+test: lint
 	@echo "==> Testing ${NAME}"
 	@go test -timeout=30s -parallel=20 -tags="${GOTAGS}" ${GOPKGS} ${TESTARGS}
 .PHONY: test
 
-test-race: ## Runs the test suite with the -race flag to identify race conditions, if they exist.
+## Runs the test suite with the -race flag to identify race conditions, if they exist.
+test-race: lint
 	@echo "==> Testing ${NAME} (race)"
 	@go test -timeout=60s -race -tags="${GOTAGS}" ${GOPKGS} ${TESTARGS}
 .PHONY: test-race
 
-test-full: ## Runs the tests with VCR disabled (i.e., makes external calls).
+## Runs the tests with VCR disabled (i.e., makes external calls).
+test-full: lint
 	@echo "==> Testing ${NAME} with VCR disabled"
 	@VCR_DISABLE=1 \
 		bash -c \
@@ -77,6 +80,9 @@ staticcheck:
 	@echo "==> Running staticcheck"
 	@staticcheck ./...
 .PHONY: staticcheck
+
+lint: dev-dependencies fiximports fmt vet staticcheck tidy
+.PHONY: lint
 
 .PHONY: help
 help: ## Prints this help menu.
