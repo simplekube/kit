@@ -20,6 +20,14 @@ type RunOptions struct {
 	Client    client.Client
 	Clientset *kubernetes.Clientset
 	Scheme    *runtime.Scheme
+
+	// Desired state field(s) with null or empty value(s) are considered
+	// as valid during Upsert operation
+	AcceptNullFieldValuesDuringUpsert *bool
+
+	// SetFinalizersToNullDuringUpsert when true will set the target's
+	// finalizers to nil during Upsert operation
+	SetFinalizersToNullDuringUpsert *bool
 }
 
 // compile time check to assert if the structure
@@ -37,7 +45,7 @@ func (o *RunOptions) ApplyTo(target RunOption) error {
 	}
 	targetObj, ok := target.(*RunOptions)
 	if !ok {
-		return errors.Errorf("invalid options type: expected RunOptions got %T", target)
+		return errors.Errorf("invalid options type: want 'RunOptions' got %T", target)
 	}
 	if o.Client != nil {
 		targetObj.Client = o.Client
@@ -47,6 +55,12 @@ func (o *RunOptions) ApplyTo(target RunOption) error {
 	}
 	if o.Scheme != nil {
 		targetObj.Scheme = o.Scheme
+	}
+	if o.AcceptNullFieldValuesDuringUpsert != nil {
+		targetObj.AcceptNullFieldValuesDuringUpsert = o.AcceptNullFieldValuesDuringUpsert
+	}
+	if o.SetFinalizersToNullDuringUpsert != nil {
+		targetObj.SetFinalizersToNullDuringUpsert = o.SetFinalizersToNullDuringUpsert
 	}
 	return nil
 }

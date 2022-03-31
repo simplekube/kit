@@ -8,6 +8,7 @@ import (
 
 	"github.com/simplekube/kit/pkg/apply"
 	"github.com/simplekube/kit/pkg/k8sutil"
+	"github.com/simplekube/kit/pkg/pointer"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/go-multierror"
@@ -77,6 +78,17 @@ func maybeSetRunOptionsWithDefaults(options *RunOptions) error {
 		// default to the scheme that understands all native Kubernetes API schemas
 		options.Scheme = scheme.Scheme
 	}
+
+	if options.AcceptNullFieldValuesDuringUpsert == nil {
+		// default to ignore null values during upsert operation
+		options.AcceptNullFieldValuesDuringUpsert = pointer.Bool(false)
+	}
+
+	if options.SetFinalizersToNullDuringUpsert == nil {
+		// default to ignore setting finalizers to null during upsert operation
+		options.SetFinalizersToNullDuringUpsert = pointer.Bool(false)
+	}
+
 	return nil
 }
 
@@ -227,6 +239,184 @@ func UpdateForAllYAMLs(ctx context.Context, filePaths []string, options ...RunOp
 
 func UpdateForYAML(ctx context.Context, filePath string, options ...RunOption) (kObj client.Object, err error) {
 	return InvokeOperationForYAML(ctx, Update, filePath, options...)
+}
+
+// OperationResult is the action result of a CreateOrUpdate call
+//
+// credit: https://github.com/kubernetes-sigs/controller-runtime/tree/master/pkg/controller/controllerutil
+type OperationResult string
+
+const (
+	// OperationResultNone implies that the resource was not changed
+	OperationResultNone OperationResult = "unchanged"
+
+	// OperationResultCreated implies that a new resource got created
+	OperationResultCreated OperationResult = "created"
+
+	// OperationResultUpdatedResourceOnly implies that an existing resource got updated
+	OperationResultUpdatedResourceOnly OperationResult = "updated-resource-only"
+
+	// OperationResultUpdatedResourceAndStatus implies an existing resource as well as its status got updated
+	OperationResultUpdatedResourceAndStatus OperationResult = "updated-resource-and-status"
+)
+
+func upsertVerbose(
+	ctx context.Context,
+	cli client.Client,
+	scheme *runtime.Scheme,
+	desired client.Object,
+	acceptNullValues bool,
+	setFinalizersToNull bool,
+) (client.Object, OperationResult, error) {
+	if cli == nil {
+		return nil, OperationResultNone, errors.New("nil client")
+	}
+	if desired == nil {
+		return nil, OperationResultNone, errors.New("nil desired object")
+	}
+	gvk, err := apiutil.GVKForObject(desired, scheme)
+	if err != nil {
+		return nil, OperationResultNone, errors.Wrap(err, "extract gvk")
+	}
+
+	// build the observed instance
+	// Note: This instance will be used to fill from the observed object
+	// found in the cluster
+	observedObj := &unstructured.Unstructured{}
+	observedObj.SetKind(gvk.Kind)
+	observedObj.SetAPIVersion(gvk.GroupVersion().String())
+	observedObj.SetNamespace(desired.GetNamespace())
+	observedObj.SetName(desired.GetName())
+
+	if err := cli.Get(ctx, client.ObjectKeyFromObject(desired), observedObj); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, OperationResultNone, err
+		}
+		var created = desired.DeepCopyObject().(client.Object)
+		if err := cli.Create(ctx, created); err != nil {
+			return nil, OperationResultNone, err
+		}
+		return created, OperationResultCreated, nil
+	}
+
+	observedUnstruct := observedObj.Object
+	desiredUnstruct, err := runtime.DefaultUnstructuredConverter.ToUnstructured(desired.DeepCopyObject())
+	if err != nil {
+		return nil, OperationResultNone, errors.Wrap(err, "convert desired to unstructured")
+	}
+
+	if !acceptNullValues {
+		// Remove null entries from the desired instance. Null entries creep
+		// in due to data types' default values
+		//
+		// Note: Key value pairs with empty string value are removed via this
+		//
+		// Note: Not doing so creates diffs between merged & observed
+		// instances. These diffs are often ambiguous & result in un-necessary
+		// update calls
+		desiredUnstruct, err = DeleteNullInUnstructuredMap(desiredUnstruct)
+		if err != nil {
+			return nil, OperationResultNone, err
+		}
+	}
+
+	// three-way client side merge of desired into observed that results
+	// in a new state called merged. Merged state in turn is updated
+	// against the cluster
+	mergedUnstruct, err := ThreeWayLocalMergeWithTwoObjects(observedUnstruct, desiredUnstruct)
+	if err != nil {
+		return nil, OperationResultNone, err
+	}
+
+	// Convert generic maps to Kubernetes Unstructured instances. This is
+	// needed to invoke K8s update API call.
+	var mergedObj = &unstructured.Unstructured{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(mergedUnstruct, mergedObj)
+	if err != nil {
+		return nil, OperationResultNone, errors.Wrap(err, "create merged object from unstructured")
+	}
+
+	if setFinalizersToNull {
+		// Note: Finalizers are given a special treatment since it is not removed
+		// via ThreeWayLocalMergeWithTwoObjects operations
+		mergedObj.SetFinalizers(nil)
+	}
+
+	// Handle metadata system fields i.e. read-only fields by setting
+	// them in the merged object from the observed object. Syncing
+	// read only fields enables comparing observed & merged object without
+	// bothering about the system generated values found in observed object.
+	//
+	// Note: This override is needed even with three-way merge strategy.
+	// This is done since serialization can result in automatic setting
+	// of default values e.g. nil, etc. against the desired state which
+	// results in a difference when desired is compared against observed.
+	//
+	// Note: This also handles setting the resourceVersion field in the merged
+	// object which in turn is mandatory for subsequent update call
+	overrideObjectMetaSystemFields(mergedObj, observedObj)
+
+	if equality.Semantic.DeepEqual(observedObj, mergedObj) {
+		// Update is ignored if there are no changes between desired & observed
+		// states
+		return nil, OperationResultNone, nil
+	}
+
+	// make a copy to update the status of this resource separately
+	var mergedStatusObj = mergedObj.DeepCopy()
+	// 1/ update resource
+	err = cli.Update(ctx, mergedObj)
+	if err != nil {
+		return nil, OperationResultNone, errors.Wrap(err, "update resource")
+	}
+
+	hasStatus, err := IsStatusSubResourceSet(desiredUnstruct)
+	if err != nil {
+		return nil, OperationResultUpdatedResourceOnly, errors.Wrap(err, "is status set")
+	}
+	if !hasStatus {
+		return mergedObj, OperationResultUpdatedResourceOnly, nil
+	}
+
+	// update resource version before proceeding with status update
+	mergedStatusObj.SetResourceVersion(mergedObj.GetResourceVersion())
+	// 2/ update resource status
+	err = cli.Status().Update(ctx, mergedStatusObj)
+	if err != nil {
+		return nil, OperationResultUpdatedResourceOnly, errors.Wrap(err, "update status")
+	}
+
+	// get the updated object from the cluster
+	err = cli.Get(ctx, client.ObjectKeyFromObject(desired), mergedObj)
+	if err != nil {
+		return nil, OperationResultUpdatedResourceAndStatus, errors.Wrap(err, "fetch updated resource")
+	}
+	return mergedObj, OperationResultUpdatedResourceAndStatus, nil
+}
+
+func UpsertVerbose(ctx context.Context, given client.Object, options ...RunOption) (client.Object, OperationResult, error) {
+	opts, err := makeRunOptions(options...)
+	if err != nil {
+		return nil, OperationResultNone, err
+	}
+	return upsertVerbose(ctx, opts.Client, opts.Scheme, given, *opts.AcceptNullFieldValuesDuringUpsert, *opts.SetFinalizersToNullDuringUpsert)
+}
+
+func Upsert(ctx context.Context, given client.Object, options ...RunOption) (client.Object, error) {
+	actual, _, err := UpsertVerbose(ctx, given, options...)
+	return actual, err
+}
+
+func UpsertAll(ctx context.Context, given []client.Object, options ...RunOption) ([]client.Object, error) {
+	return InvokeOperationForAllObjects(ctx, Upsert, given, options...)
+}
+
+func UpsertForAllYAMLs(ctx context.Context, filePaths []string, options ...RunOption) ([]client.Object, error) {
+	return InvokeOperationForAllYAMLs(ctx, Upsert, filePaths, options...)
+}
+
+func UpsertForYAML(ctx context.Context, filePath string, options ...RunOption) (kObj client.Object, err error) {
+	return InvokeOperationForYAML(ctx, Upsert, filePath, options...)
 }
 
 func Delete(ctx context.Context, given client.Object, options ...RunOption) error {
@@ -487,28 +677,6 @@ func AssertIsNotFoundForYAML(ctx context.Context, filePath string, options ...Ru
 	return AssertYAML(ctx, filePath, AssertOptions{AssertType: AssertTypeIsNotFound}, options...)
 }
 
-// OperationResult is the action result of a CreateOrUpdate call.
-//
-// credit: https://github.com/kubernetes-sigs/controller-runtime/tree/master/pkg/controller/controllerutil
-type OperationResult string
-
-const (
-	// OperationResultNone implies that the resource was not changed
-	OperationResultNone OperationResult = "unchanged"
-
-	// OperationResultCreated implies that a new resource got created
-	OperationResultCreated OperationResult = "created"
-
-	// OperationResultUpdatedResourceOnly implies that an existing resource got updated
-	OperationResultUpdatedResourceOnly OperationResult = "updated-resource-only"
-
-	// OperationResultUpdatedResourceAndStatus implies an existing resource as well as its status got updated
-	OperationResultUpdatedResourceAndStatus OperationResult = "updated-resource-and-status"
-
-	// OperationResultUpdatedStatusOnly implies that only an existing status got updated
-	OperationResultUpdatedStatusOnly OperationResult = "updated-status-only"
-)
-
 type EventuallyOptions struct {
 	RetryInterval    time.Duration
 	RetryTimeout     time.Duration
@@ -519,6 +687,9 @@ type EventuallyOptions struct {
 // CreateOrMerge creates or merges the desired object in the Kubernetes
 // cluster. The desired state is merged into the observed state found
 // in the cluster.
+//
+// TODO (@amit.das)
+// Deprecate this in favour of Upsert once all tests pass
 func CreateOrMerge(ctx context.Context, cli client.Client, scheme *runtime.Scheme, desired client.Object) (OperationResult, error) {
 	result, err := createOrMerge(ctx, cli, scheme, desired)
 	if err == nil {
@@ -531,6 +702,8 @@ func CreateOrMerge(ctx context.Context, cli client.Client, scheme *runtime.Schem
 	return result, err
 }
 
+// TODO (@amit.das)
+// Deprecate this in favour of Upsert once all tests pass
 func createOrMerge(ctx context.Context, cli client.Client, scheme *runtime.Scheme, desired client.Object) (OperationResult, error) {
 	if cli == nil {
 		return OperationResultNone, errors.New("nil client")
