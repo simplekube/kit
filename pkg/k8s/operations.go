@@ -576,7 +576,7 @@ func createOrMerge(ctx context.Context, cli client.Client, scheme *runtime.Schem
 	//
 	// Note: Not doing so creates unneeded diffs between
 	// merged & observed instances
-	desiredUnstruct, err = DeleteNullInUnstruct(desiredUnstruct)
+	desiredUnstruct, err = DeleteNullInUnstructuredMap(desiredUnstruct)
 	if err != nil {
 		return OperationResultNone, errors.Wrap(err, "failed to remove null from desired state")
 	}
