@@ -19,6 +19,11 @@ all: test
 .PHONY: all
 
 ## Clean up project's Go modules
+# Note: This should be run by humans & not CI systems so that
+# the changes can be accounted for as git commits & also
+# provide a chance for code reviews
+#
+# refer - https://go.dev/blog/supply-chain
 tidy:
 	@echo "==> Tidying module"
 	@go mod tidy
@@ -81,7 +86,7 @@ staticcheck:
 	@staticcheck ./...
 .PHONY: staticcheck
 
-lint: dev-dependencies fiximports fmt vet staticcheck tidy
+lint: dev-dependencies fiximports fmt vet staticcheck
 .PHONY: lint
 
 .PHONY: help
