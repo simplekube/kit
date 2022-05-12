@@ -29,6 +29,7 @@ This project is primarily meant to be consumed as a library by various out-of-tr
 
 ## Build & Test
 - Testing pkg/k8s requires setting up the test environment
+- Run below command to execute tests
 ```shell
 make
 ```
