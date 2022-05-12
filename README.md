@@ -28,29 +28,33 @@ This project is primarily meant to be consumed as a library by various out-of-tr
 - A thin wrapper over [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime)
 
 ## Build & Test
-- make
+- Testing pkg/k8s requires setting up the test environment
+```shell
+make
+```
 
 ### Setup test environment aka envtest
 - Install envtest binary
-  - refer: [setup-envtest](https://github.com/kubernetes-sigs/controller-runtime/tree/v0.10.3/tools/setup-envtest)
+  - refer: [setup-envtest](https://github.com/kubernetes-sigs/controller-runtime/tree/v0.12.0/tools/setup-envtest)
+  - go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 - Run below to download `kubectl`, `apiserver` & `etcd` binaries
 ```shell
 setup-envtest --bin-dir=/usr/local/kubebuilder/bin use
 ```
 - On Mac, you get similar output
 ```shell
-Version: 1.22.1
+Version: 1.23.5
 OS/Arch: darwin/amd64
-md5: 0yL+nN2utkMPWXaoStXMKg==
-Path: /usr/local/kubebuilder/bin/k8s/1.22.1-darwin-amd64
+md5: /UKeR3sIKE/Y5zd8A2Tjog==
+Path: /usr/local/kubebuilder/bin/k8s/1.23.5-darwin-amd64
 ```
 - Verify presence of images
 ```shell
-ls -ltr /usr/local/kubebuilder/bin/k8s/1.22.1-darwin-amd64
+ls -ltr /usr/local/kubebuilder/bin/k8s/1.23.5-darwin-amd64/
 ```
 - Move these binaries to the default lookup path used by controller-runtime
 ```shell
-mv /usr/local/kubebuilder/bin/k8s/1.22.1-darwin-amd64/* /usr/local/kubebuilder/bin/
+mv /usr/local/kubebuilder/bin/k8s/1.23.5-darwin-amd64/* /usr/local/kubebuilder/bin/
 ```
 
 ## References
